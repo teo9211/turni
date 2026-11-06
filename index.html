@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Turni">
+<meta name="theme-color" content="#f2f2f7">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Turni</title>
+<style>
+:root{--bg:#f2f2f7;--card:#fff;--tx:#111;--mut:#6b7280;--line:#e5e7eb;--acc:#0a84ff;--red:#ef4444;--ok:#16a34a;--sab:env(safe-area-inset-bottom)}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--tx:#f5f5f7;--mut:#9ca3af;--line:#2c2c2e}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.35 -apple-system,system-ui,"SF Pro Text",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.view{padding:calc(env(safe-area-inset-top) + 12px) 14px calc(90px + var(--sab));max-width:640px;margin:0 auto}
+.tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:var(--sab);z-index:5}
+.tab{flex:1;padding:8px 0 6px;text-align:center;font-size:11px;color:var(--mut);border:0;background:none}
+.tab i{display:block;font-style:normal;font-size:22px}
+.tab.on{color:var(--acc)}
+h1{font-size:28px;margin:4px 0 12px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:20px 4px 6px}
+.card{background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ttl{flex:1;text-align:center;font-size:19px;font-weight:600}
+.btn{border:0;background:var(--card);border-radius:10px;padding:8px 12px;color:var(--acc);font-weight:600}
+.btn.pri{background:var(--acc);color:#fff}
+.btn.del{color:var(--red)}
+.btn.sm{padding:5px 9px;font-size:14px}
+.row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row>.l{flex:1;min-width:0}
+.row>.r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.mut{color:var(--mut);font-size:13px}
+.big{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wd{text-align:center;font-size:12px;color:var(--mut);padding:2px 0}
+.cell{background:var(--card);border-radius:9px;min-height:64px;padding:3px 3px 2px;border:2px solid transparent;overflow:hidden;position:relative}
+.cell.today{border-color:var(--acc)}
+.cell.blank{background:none}
+.cell .n{font-size:12px;font-weight:600}
+.cell.sun .n{color:var(--red)}
+.pill{display:block;font-size:10px;color:#fff;border-radius:5px;padding:1px 3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.bd{display:inline-block;font-size:9px;color:#fff;border-radius:4px;padding:0 3px;margin:2px 1px 0 0}
+.seg{display:flex;background:var(--bg);border-radius:9px;padding:2px;gap:2px}
+.seg button{flex:1;border:0;background:none;padding:6px;border-radius:7px;font-size:14px}
+.seg button.on{background:var(--card);font-weight:600;box-shadow:0 1px 2px #0002}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:7px 12px;font-size:15px}
+.chip.on{color:#fff;border-color:transparent}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0;width:100%}
+input[type=color]{padding:0;width:38px;height:34px;flex:none}
+input[type=checkbox]{width:auto}
+.f{display:flex;gap:8px;align-items:center;margin:6px 0}
+.f>label{width:92px;flex:none;font-size:14px;color:var(--mut)}
+.days{display:flex;gap:4px}
+.days button{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 0;font-size:13px}
+.days button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.ov{position:fixed;inset:0;background:#0006;z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(24px + var(--sab))}
+.sheet h3{margin:0 0 8px;font-size:19px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + var(--sab));background:#111d;color:#fff;padding:9px 16px;border-radius:999px;z-index:30;font-size:14px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+td,th{padding:5px 2px;border-bottom:1px solid var(--line);text-align:right}
+td:first-child,th:first-child{text-align:left}
+.pos{color:var(--ok)}.neg{color:var(--red)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script id="core">
+/* ===== Date helpers (stringhe ISO YYYY-MM-DD, calcoli in UTC: nessun problema di ora legale) ===== */
+const pad=n=>String(n).padStart(2,'0');
+const iso=(y,m,d)=>`${y}-${pad(m)}-${pad(d)}`;
+const parseD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(Date.UTC(y,m-1,d));};
+const fmtD=dt=>iso(dt.getUTCFullYear(),dt.getUTCMonth()+1,dt.getUTCDate());
+const addDays=(s,n)=>{const d=parseD(s);d.setUTCDate(d.getUTCDate()+n);return fmtD(d);};
+const dow=s=>parseD(s).getUTCDay(); // 0=dom ... 6=sab
+const mondayOf=s=>addDays(s,-((dow(s)+6)%7));
+const diffDays=(a,b)=>Math.round((parseD(b)-parseD(a))/86400000);
+const todayISO=()=>{const n=new Date();return iso(n.getFullYear(),n.getMonth()+1,n.getDate());};
+const daysInMonth=(y,m)=>new Date(Date.UTC(y,m,0)).getUTCDate();
+const toMin=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};
+const shiftHours=s=>{let d=toMin(s.end)-toMin(s.start);if(d<=0)d+=1440;return d/60;};
+
+/* ===== Dati di default ===== */
+function defaults(){return{
+  v:1,
+  shifts:[
+    {id:'mat',name:'Mattino',start:'06:00',end:'12:00',days:[1,2,3,4,5,6],color:'#f59e0b'},
+    {id:'pom',name:'Pomeriggio',start:'12:00',end:'19:30',days:[1,2,3,4,5],color:'#6366f1'},
+    {id:'gio',name:'Giornata',start:'07:00',end:'14:30',days:[1,2,3,4,5],color:'#10b981'}
+  ],
+  rates:[
+    {id:'base',name:'Paga oraria',value:0},
+    {id:'sat',name:'Maggiorazione sabato (€/h in più)',value:0},
+    {id:'dop',name:'Festivo paga doppia',value:0},
+    {id:'tri',name:'Festivo paga tripla',value:0},
+    {id:'str',name:'Straordinario',value:0}
+  ],
+  badges:[
+    {id:'fer',name:'Ferie',kind:'leave',rate:'base',color:'#ec4899',short:'FER'},
+    {id:'ban',name:'Banca ore',kind:'bank',rate:'base',color:'#0ea5e9',short:'BO'},
+    {id:'fd',name:'Festivo doppio',kind:'rate',rate:'dop',color:'#ef4444',short:'2×'},
+    {id:'ft',name:'Festivo triplo',kind:'rate',rate:'tri',color:'#b91c1c',short:'3×'},
+    {id:'str',name:'Straordinario',kind:'extra',rate:'str',color:'#8b5cf6',short:'STR'},
+    {id:'mal',name:'Malattia',kind:'sick',rate:'base',policy:'mal',color:'#14b8a6',short:'MAL'},
+    {id:'inf',name:'Infortunio',kind:'sick',rate:'base',policy:'inf',color:'#f97316',short:'INF'}
+  ],
+  bankRules:[],
+  bankOpening:0,
+  monthly:{on:false,hours:0},
+  mig:3,
+  sick:{policies:[
+    {id:'mal',name:'Malattia comune (ISS)',tiers:[{from:1,to:14,pct:86},{from:15,to:180,pct:100},{from:181,to:365,pct:86}],short:{on:true,under:5,first:2,pct:50}},
+    {id:'inf',name:'Infortunio / malattia professionale',tiers:[{from:1,to:365,pct:100}],short:{on:false,under:5,first:2,pct:50}}
+  ]},
+  tax:{on:true,iss:7.4,sind:0.4,fondiss:2.5,altre:0,months:13,smac:0,altreDetr:0,
+    brackets:[{upTo:10000,rate:9},{upTo:18000,rate:13},{upTo:28000,rate:17},{upTo:38000,rate:21},{upTo:50000,rate:25},{upTo:65000,rate:28},{upTo:80000,rate:31},{upTo:null,rate:35}]},
+  rotation:['mat','pom','gio'],
+  days:{}
+};}
+
+/* ===== Malattia: episodi e percentuale per giorno ===== */
+function pctFor(P,idx,len){
+  if(P.short&&P.short.on&&len<P.short.under&&idx<=P.short.first)return P.short.pct;
+  const t=P.tiers.find(q=>idx>=q.from&&idx<=q.to);
+  if(t)return t.pct;
+  return P.tiers.length?P.tiers[P.tiers.length-1].pct:100;
+}
+function sickMap(D){
+  const isSick=x=>{const b=D.badges.find(q=>q.id===x.id);return b&&b.kind==='sick'?b:null;};
+  const days=Object.keys(D.days).filter(ds=>(D.days[ds].b||[]).some(isSick)).sort();
+  const eps=[];let ep=null;
+  for(const ds of days){
+    const b=(D.days[ds].b||[]).map(isSick).find(Boolean);
+    let cont=false;
+    if(ep&&ep.pol===b.policy){
+      cont=diffDays(ep.last,ds)-1<=3; // si uniscono solo pause senza turno di al massimo 3 giorni (weekend / festivo)
+      for(let x=addDays(ep.last,1);cont&&x<ds;x=addDays(x,1)){const e=D.days[x];if(e&&e.s){cont=false;break;}}
+    }
+    if(!cont){ep={pol:b.policy,start:ds,last:ds,days:[]};eps.push(ep);}
+    ep.last=ds;ep.days.push(ds);
+  }
+  const map={};
+  eps.forEach((e,i)=>{
+    const len=diffDays(e.start,e.last)+1;
+    const P=((D.sick&&D.sick.policies)||[]).find(q=>q.id===e.pol);
+    for(const ds of e.days){const idx=diffDays(e.start,ds)+1;map[ds]={pct:P?pctFor(P,idx,len):100,idx,len,ep:i};}
+  });
+  return{map,n:eps.length};
+}
+
+/* ===== Perdita banca ore settimanale (es. settimana da 6h) assorbita dallo straordinario ===== */
+function weekMap(D,sm){
+  sm=sm||sickMap(D);
+  const weeks={};
+  for(const ds of Object.keys(D.days).sort()){const k=mondayOf(ds);(weeks[k]=weeks[k]||[]).push(ds);}
+  const loss={},abs={};
+  for(const wk in weeks){
+    let amt=0,at=null,ot=0;const ots=[];
+    for(const ds of weeks[wk]){
+      const r=calcDay(D,ds,sm,null);
+      if(r.rule&&r.rule.weekly&&r.rule.delta<0){if(r.rule.delta<amt)amt=r.rule.delta;if(!at)at=ds;}
+      if(r.extraRaw>0){ots.push([ds,r.extraRaw]);ot+=r.extraRaw;}
+    }
+    if(!at)continue;
+    const need=-amt,cover=Math.min(ot,need);
+    loss[at]=cover>=need?0:-(need-cover);
+    let rem=cover;
+    for(const [ds,hh] of ots){if(rem<=1e-9)break;const a=Math.min(hh,rem);abs[ds]=a;rem-=a;}
+  }
+  return{loss,abs};
+}
+
+/* ===== Calcolo giornata ===== */
+const add=(o,k,v)=>{o[k]=(o[k]||0)+v;};
+function calcDay(D,ds,sm,wm){
+  sm=sm||sickMap(D);
+  if(wm===undefined)wm=weekMap(D,sm);
+  const e=D.days[ds];
+  const r={ds,shiftId:null,H:0,worked:0,counted:false,leaveH:0,bankH:0,extraH:0,pay:{},total:0,bankDelta:0,hoursBy:{},sickH:0,rule:null,extraRaw:0,extraAbs:0,rateH:0,satH:0,festBase:false,rateId:null};
+  if(!e)return r;
+  const rate=id=>{const x=D.rates.find(q=>q.id===id);return x?x.value:0;};
+  const shift=D.shifts.find(s=>s.id===e.s);
+  const H=shift?shiftHours(shift):0;
+  r.shiftId=shift?shift.id:null;r.H=H;
+  const bs=(e.b||[]).map(x=>({x,b:D.badges.find(q=>q.id===x.id)})).filter(q=>q.b);
+  let cov=0;
+  for(const kind of ['leave','sick','bank'])for(const {x,b} of bs)if(b.kind===kind){
+    const want=x.h==null?H:x.h;
+    const hh=Math.max(0,Math.min(want,H-cov));
+    cov+=hh;
+    add(r.hoursBy,b.id,hh);
+    const sp=kind==='sick'?((sm.map[ds]||{}).pct??100)/100:1;
+    add(r.pay,'b:'+b.id,hh*rate(b.rate)*sp);
+    if(kind==='leave')r.leaveH+=hh;else if(kind==='sick')r.sickH+=hh;else r.bankH+=hh;
+  }
+  r.worked=Math.max(0,H-cov);
+  if(r.worked<1e-9)r.worked=0;
+  r.counted=r.worked>0;
+  const rb=bs.find(q=>q.b.kind==='rate');
+  if(r.worked>0){
+    if(rb){add(r.pay,'b:'+rb.b.id,r.worked*rate(rb.b.rate));r.rateH=r.worked;r.rateId=rb.b.id;r.festBase=rb.b.inclBase!==false;}
+    else{
+      add(r.pay,'ord',r.worked*rate('base'));
+      if(dow(ds)===6){add(r.pay,'sat',r.worked*rate('sat'));r.satH=r.worked;}
+    }
+    const rule=D.bankRules.find(q=>Math.abs(q.hours-r.worked)<0.01);
+    if(rule){
+      r.rule=rule;r.bankDelta=rule.delta;
+      if(wm&&rule.weekly&&rule.delta<0)r.bankDelta=wm.loss[ds]||0;
+    }
+  }
+  for(const {x,b} of bs)if(b.kind==='extra'){
+    const raw=x.h||0,ab=Math.min(raw,wm?(wm.abs[ds]||0):0),hh=raw-ab;
+    r.extraRaw+=raw;r.extraAbs+=ab;r.extraH+=hh;add(r.hoursBy,b.id,hh);add(r.pay,'b:'+b.id,hh*rate(b.rate));
+  }
+  r.total=Object.values(r.pay).reduce((a,b)=>a+b,0);
+  return r;
+}
+
+function aggregate(D,from,to){
+  const A={from,to,shiftCount:{},shiftHours:{},worked:0,leaveH:0,bankUsed:0,extraH:0,pay:{},hrs:{},total:0,earned:0,lost:0,badgeDays:{},badgeHours:{},workedDays:0,boaH:0,sickDays:0,sickEp:0,sickH:0,absH:0,badgeMarked:{},fixed:false,net:0,ded:{iss:0,sind:0,fond:0,lorda:0,igr:0}};
+  const fixed=!!(D.monthly&&D.monthly.on);A.fixed=fixed;
+  const base=(D.rates.find(q=>q.id==='base')||{value:0}).value;
+  const months={},sm=sickMap(D),wm=weekMap(D,sm),eps=new Set();
+  for(const ds of Object.keys(D.days)){
+    if(ds<from||ds>to)continue;
+    const e=D.days[ds],r=calcDay(D,ds,sm,wm),mk=ds.slice(0,7);
+    const M=months[mk]||(months[mk]={pay:{},hrs:{},fesH:0,noFestH:0,leaveH:0,bankH:0,extraH:0,sickH:0,hasShift:false});
+    if(r.shiftId)M.hasShift=true;
+    if(r.counted){A.shiftCount[r.shiftId]=(A.shiftCount[r.shiftId]||0)+1;add(A.shiftHours,r.shiftId,r.worked);A.workedDays++;}
+    A.worked+=r.worked;A.absH+=r.extraAbs;A.sickH+=r.sickH;A.leaveH+=r.leaveH;A.bankUsed+=r.bankH;A.extraH+=r.extraH;
+    for(const k in r.pay){if(fixed&&k==='ord')continue;add(M.pay,k,r.pay[k]);}
+    if(!fixed&&r.worked>0&&!r.rateH)add(M.hrs,'ord',r.worked);
+    if(r.satH)add(M.hrs,'sat',r.satH);
+    if(r.rateH)add(M.hrs,'b:'+r.rateId,r.rateH);
+    M.fesH+=r.festBase?r.rateH:0;M.noFestH+=r.rateH?0:r.worked;M.leaveH+=r.leaveH;M.sickH+=r.sickH;M.bankH+=r.bankH;M.extraH+=r.extraH;
+    if(r.bankDelta>0)A.earned+=r.bankDelta;else A.lost-=r.bankDelta;
+    for(const x of e.b||[]){
+      const b=D.badges.find(q=>q.id===x.id);if(!b)continue;
+      add(A.badgeMarked,b.id,1);
+      if(b.kind==='sick'){A.sickDays++;eps.add(sm.map[ds]?sm.map[ds].ep:-1);}
+      const hh=r.hoursBy[b.id]||0;
+      if(b.kind!=='rate')add(M.hrs,'b:'+b.id,hh);
+      add(A.badgeHours,b.id,b.kind==='rate'?0:hh);
+      add(A.badgeDays,b.id,b.kind==='rate'?1:(b.kind==='extra'?0:(r.H?hh/r.H:0)));
+    }
+  }
+  for(const mk in months){
+    const M=months[mk];
+    if(fixed&&M.hasShift){
+      const ord=Math.max(0,D.monthly.hours-M.fesH-M.leaveH-M.sickH-M.bankH-M.extraH);
+      M.pay.ord=ord*base;M.hrs.ord=ord;
+      if(M.fesH){M.pay.fes=M.fesH*base;M.hrs.fes=M.fesH;}
+      A.boaH+=Math.max(0,M.noFestH-ord);
+    }
+    const g=Object.values(M.pay).reduce((a,b)=>a+b,0);
+    if(D.tax&&D.tax.on&&g>0){const n=netOf(D,g);A.ded.iss+=n.iss;A.ded.sind+=n.sind;A.ded.fond+=n.fond;A.ded.lorda+=n.lorda;A.ded.igr+=n.igr;A.net+=n.net;}
+    else A.net+=g;
+    for(const k in M.pay)add(A.pay,k,M.pay[k]);
+    for(const k in M.hrs)add(A.hrs,k,M.hrs[k]);
+  }
+  A.total=Object.values(A.pay).reduce((a,b)=>a+b,0);
+  A.sickEp=eps.size;
+  return A;
+}
+
+/* ===== Netto (ritenute San Marino: ISS, Fondiss, IGR su base annualizzata) ===== */
+const r2=x=>Math.round((x+1e-9)*100)/100;
+function netOf(D,gross){
+  const T=D.tax,p=k=>(T[k]||0)/100;
+  const iss=r2(gross*p('iss')),sind=r2(gross*p('sind')),fond=r2(gross*p('fondiss'));
+  const imp=r2(gross*(1-p('iss')-p('sind')-p('fondiss')-p('altre')));
+  const n=T.months||13,annual=imp*n;
+  let tax=0,prev=0;
+  for(const b of T.brackets){const top=b.upTo==null?Infinity:b.upTo;if(annual>prev)tax+=(Math.min(annual,top)-prev)*b.rate/100;prev=top;if(annual<=top)break;}
+  const lorda=r2(tax/n);
+  const igr=Math.max(0,r2(lorda-(T.smac||0)-(T.altreDetr||0)));
+  return{iss,sind,fond,imp,lorda,igr,net:r2(gross-iss-sind-fond-igr)};
+}
+
+function bankBalance(D,upTo){
+  let t=D.bankOpening||0;const sm=sickMap(D),wm=weekMap(D,sm);
+  for(const ds of Object.keys(D.days)){if(ds>upTo)continue;const r=calcDay(D,ds,sm,wm);t+=r.bankDelta-r.bankH;}
+  return t;
+}
+
+/* ===== Modifica giorni ===== */
+function migrate(D){
+  const d0=defaults();
+  for(const k of ['sick','tax','monthly'])if(!D[k])D[k]=d0[k];
+  if(!D.mig){for(const b of d0.badges)if(b.kind==='sick'&&!D.badges.some(x=>x.id===b.id))D.badges.push(b);D.mig=2;}
+  if(D.mig<3){D.bankRules.forEach(r=>{if(r.delta<0&&r.weekly===undefined)r.weekly=true;});D.mig=3;}
+  return D;
+}
+function getDay(D,ds){return D.days[ds]||(D.days[ds]={s:null,b:[],n:''});}
+function cleanDay(D,ds){const e=D.days[ds];if(e&&!e.s&&!(e.b&&e.b.length)&&!e.n)delete D.days[ds];}
+
+/* mode: 'empty' = solo giorni senza turno; 'shift' = sostituisce i turni e tiene i badge; 'all' = sostituisce tutto */
+function generate(D,{from,to,startIndex,mode}){
+  const rot=D.rotation;if(!rot.length)return 0;
+  const m0=mondayOf(from);let n=0;
+  for(let ds=from;ds<=to;ds=addDays(ds,1)){
+    const wk=Math.floor(diffDays(m0,ds)/7);
+    const id=rot[((startIndex+wk)%rot.length+rot.length)%rot.length];
+    const sh=D.shifts.find(s=>s.id===id);
+    const ok=sh&&sh.days.includes(dow(ds));
+    const cur=D.days[ds];
+    if(mode==='empty'){if(cur&&cur.s)continue;if(!ok)continue;getDay(D,ds).s=sh.id;n++;continue;}
+    if(mode==='all')delete D.days[ds];
+    if(ok){getDay(D,ds).s=sh.id;n++;}
+    else if(D.days[ds])D.days[ds].s=null;
+    cleanDay(D,ds);
+  }
+  return n;
+}
+</script>
+
+<script id="ui">
+/* ===== Stato e salvataggio ===== */
+const KEY='turni.v1';
+let D=(function(){try{const t=localStorage.getItem(KEY);if(t){const o=JSON.parse(t);return migrate(Object.assign(defaults(),o,{mig:o.mig||0}));}}catch(e){}return defaults();})();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(D));}catch(e){}}
+const t0=new Date();
+const S={tab:'cal',cal:{y:t0.getFullYear(),m:t0.getMonth()+1},st:{mode:'month',y:t0.getFullYear(),m:t0.getMonth()+1,toEnd:false,m1:1,m2:t0.getMonth()+1},gen:{index:0,mode:'empty'}};
+const MONTHS=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const WD=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+const WD1=['L','M','M','G','V','S','D'];
+const EUR=new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'});
+const N5=new Intl.NumberFormat('it-IT',{maximumFractionDigits:5});
+const eur=x=>EUR.format(x);
+function fh(x,sign){const neg=x<0;const m=Math.round(Math.abs(x)*60);const hh=Math.floor(m/60),mm=m%60;return (neg?'−':(sign&&m>0?'+':''))+hh+'h'+(mm?' '+pad(mm)+'m':'');}
+const uid=p=>p+Math.random().toString(36).slice(2,8);
+
+/* ===== Mini DOM helper ===== */
+function h(tag,a,...kids){
+  const el=document.createElement(tag);let val;
+  if(a)for(const k in a){const v=a[k];if(v==null||v===false)continue;
+    if(k==='class')el.className=v;else if(k==='style')el.style.cssText=v;
+    else if(k.startsWith('on'))el.addEventListener(k.slice(2),v);
+    else if(k==='value')val=v;else if(k==='checked')el.checked=!!v;
+    else el.setAttribute(k,v===true?'':v);}
+  for(const c of kids.flat(9)){if(c==null||c===false)continue;el.append(c.nodeType?c:document.createTextNode(c));}
+  if(val!==undefined)el.value=val;
+  return el;
+}
+const btn=(t,f,c)=>h('button',{class:'btn '+(c||''),onclick:f},t);
+function toast(msg){const t=h('div',{class:'toast'},msg);document.body.append(t);setTimeout(()=>t.remove(),2200);}
+const cov=k=>k==='leave'||k==='bank'||k==='sick';
+const badgeOf=id=>D.badges.find(b=>b.id===id);
+const shiftOf=id=>D.shifts.find(s=>s.id===id);
+const short3=s=>s.name.slice(0,3).toUpperCase();
+const longDate=ds=>{const d=parseD(ds);return `${WD[(dow(ds)+6)%7]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].toLowerCase()} ${d.getUTCFullYear()}`;};
+
+/* ===== Sheet ===== */
+let sheetEl=null;
+function openSheet(builder){
+  closeSheet();
+  const body=h('div',{class:'sheet'});
+  const ov=h('div',{class:'ov',onclick:e=>{if(e.target===ov)closeSheet();}},body);
+  const rebuild=()=>{const st=body.scrollTop;body.replaceChildren(builder(rebuild));body.scrollTop=st;};
+  rebuild();document.body.append(ov);sheetEl=ov;
+}
+function closeSheet(){if(sheetEl){sheetEl.remove();sheetEl=null;}}
+
+/* ===== Render principale ===== */
+function render(){
+  const v=S.tab==='cal'?calView():S.tab==='stats'?statsView():setView();
+  const tab=(id,ic,l)=>h('button',{class:'tab'+(S.tab===id?' on':''),onclick:()=>{if(S.tab!==id){S.tab=id;render();scrollTo(0,0);}}},h('i',null,ic),l);
+  document.getElementById('app').replaceChildren(h('main',{class:'view'},v),h('nav',{class:'tabbar'},tab('cal','📅','Calendario'),tab('stats','📊','Conteggi'),tab('set','⚙️','Impostazioni')));
+}
+
+/* ===== CALENDARIO ===== */
+function moveMonth(n){let {y,m}=S.cal;m+=n;if(m<1){m=12;y--;}if(m>12){m=1;y++;}S.cal={y,m};render();}
+function calView(){
+  const {y,m}=S.cal;const first=iso(y,m,1),dim=daysInMonth(y,m),lead=(dow(first)+6)%7,today=todayISO();
+  const A=aggregate(D,first,iso(y,m,dim));
+  const cells=[];
+  for(let i=0;i<lead;i++)cells.push(h('div',{class:'cell blank'}));
+  for(let d=1;d<=dim;d++){
+    const ds=iso(y,m,d),e=D.days[ds],sh=e&&shiftOf(e.s);
+    const bds=(e&&e.b||[]).map(x=>badgeOf(x.id)).filter(Boolean);
+    cells.push(h('div',{class:'cell'+(ds===today?' today':'')+(dow(ds)===0?' sun':''),onclick:()=>openDay(ds)},
+      h('div',{class:'n'},d),
+      sh&&h('span',{class:'pill',style:'background:'+sh.color},short3(sh)),
+      bds.map(b=>h('span',{class:'bd',style:'background:'+b.color},b.short))));
+  }
+  return h('div',null,
+    h('div',{class:'bar'},btn('‹',()=>moveMonth(-1)),h('div',{class:'ttl'},MONTHS[m-1]+' '+y),btn('›',()=>moveMonth(1))),
+    h('div',{class:'bar'},btn('Oggi',()=>{S.cal={y:t0.getFullYear(),m:t0.getMonth()+1};render();}),h('div',{style:'flex:1'}),btn('✨ Compila turni',openGen,'pri')),
+    h('div',{class:'grid'},WD.map(w=>h('div',{class:'wd'},w)),cells),
+    h('div',{class:'card',style:'margin-top:12px'},
+      h('div',{class:'row'},h('div',{class:'l'},'Giorni lavorati'),h('div',{class:'r'},A.workedDays)),
+      h('div',{class:'row'},h('div',{class:'l'},'Ore lavorate'),h('div',{class:'r'},fh(A.worked))),
+      h('div',{class:'row'},h('div',{class:'l'},'Guadagno lordo del mese'),h('div',{class:'r'},eur(A.total))),
+      D.tax.on&&h('div',{class:'row'},h('div',{class:'l'},'Netto stimato'),h('div',{class:'r'},eur(A.net)))),
+    h('div',{class:'card'},D.shifts.map(s=>h('div',{class:'row'},h('span',{class:'pill',style:'background:'+s.color+';width:44px'},short3(s)),h('div',{class:'l'},s.name),h('div',{class:'mut'},s.start+'–'+s.end)))));
+}
+
+/* --- foglio giorno --- */
+function openDay(ds){
+  const st={scope:'day',end:ds,bid:(D.badges[0]||{}).id,mode:'full',hrs:''};
+  const targets=()=>{
+    if(st.scope==='day')return [ds];
+    const out=[];let a,b;
+    if(st.scope==='week'){a=mondayOf(ds);b=addDays(a,6);}else{a=ds;b=st.end<ds?ds:st.end;}
+    for(let x=a,i=0;x<=b&&i<400;x=addDays(x,1),i++)out.push(x);
+    return out;
+  };
+  openSheet(rebuild=>{
+    const e=D.days[ds]||{s:null,b:[],n:''};
+    const sm=sickMap(D);
+    const T=targets();
+    const label=st.scope==='day'?'solo questo giorno':`${T.length} giorni (${T[0].slice(5)} → ${T[T.length-1].slice(5)})`;
+    const sel=D.badges.find(b=>b.id===st.bid);
+    return h('div',null,
+      h('h3',null,longDate(ds)),
+      h('div',{class:'seg'},[['day','Giorno'],['week','Settimana'],['range','Intervallo']].map(([k,l])=>h('button',{class:st.scope===k?'on':'',onclick:()=>{st.scope=k;rebuild();}},l))),
+      st.scope==='range'&&h('div',{class:'f'},h('label',null,'Fino al'),h('input',{type:'date',value:st.end,min:ds,onchange:ev=>{st.end=ev.target.value||ds;rebuild();}})),
+      h('div',{class:'mut',style:'margin:6px 2px'},'Le azioni sotto si applicano a: '+label),
+      h('h2',null,'Turno'),
+      h('div',{class:'chips'},
+        h('button',{class:'chip'+(!e.s?' on':''),style:!e.s?'background:#6b7280':'',onclick:()=>{for(const t of T){if(D.days[t]){D.days[t].s=null;cleanDay(D,t);}}save();render();rebuild();}},'Nessuno'),
+        D.shifts.map(s=>h('button',{class:'chip'+(e.s===s.id?' on':''),style:e.s===s.id?'background:'+s.color:'',onclick:()=>{
+          for(const t of T){
+            if(st.scope==='day'||s.days.includes(dow(t)))getDay(D,t).s=s.id;
+            else if(D.days[t]){D.days[t].s=null;cleanDay(D,t);}
+          }
+          save();render();rebuild();}},s.name))),
+      h('h2',null,'Badge sul giorno'),
+      (e.b||[]).length?h('div',{class:'card'},e.b.map(x=>{const b=badgeOf(x.id);if(!b)return null;
+        return h('div',{class:'row'},h('span',{class:'bd',style:'background:'+b.color+';font-size:12px;padding:1px 6px'},b.short),
+          h('div',{class:'l'},b.name,' ',h('span',{class:'mut'},b.kind==='rate'?'':(x.h==null?'giornata intera':fh(x.h)),b.kind==='sick'&&sm.map[ds]?' · '+sm.map[ds].pct+'% (giorno '+sm.map[ds].idx+')':'')),
+          btn('Rimuovi',()=>{for(const t of T){const d=D.days[t];if(d){d.b=(d.b||[]).filter(q=>q.id!==x.id);cleanDay(D,t);}}save();render();rebuild();},'del sm'));})):h('div',{class:'mut',style:'margin:0 4px 6px'},'Nessun badge'),
+      h('div',{class:'card'},
+        h('div',{class:'f'},h('label',null,'Aggiungi'),h('select',{value:st.bid,onchange:ev=>{st.bid=ev.target.value;rebuild();}},D.badges.map(b=>h('option',{value:b.id},b.name)))),
+        sel&&cov(sel.kind)&&h('div',{class:'f'},h('label',null,'Copre'),h('select',{value:st.mode,onchange:ev=>{st.mode=ev.target.value;rebuild();}},h('option',{value:'full'},'Giornata intera'),h('option',{value:'part'},'Solo alcune ore'))),
+        sel&&(cov(sel.kind)&&st.mode==='part'||sel.kind==='extra')&&h('div',{class:'f'},h('label',null,'Ore'),h('input',{type:'number',step:'0.25',min:'0',inputmode:'decimal',placeholder:'es. 1,5',value:st.hrs,onchange:ev=>{st.hrs=ev.target.value;}})),
+        btn('Aggiungi badge',()=>{
+          if(!sel)return;
+          let hh=null;
+          if(sel.kind==='extra'||(cov(sel.kind)&&st.mode==='part')){
+            hh=parseFloat(String(st.hrs).replace(',','.'));
+            if(!(hh>0)){toast('Inserisci le ore');return;}
+          }
+          for(const t of T){
+            if(st.scope!=='day'&&!(D.days[t]&&D.days[t].s))continue;
+            const d=getDay(D,t);d.b=(d.b||[]).filter(q=>q.id!==sel.id);d.b.push({id:sel.id,h:hh});
+          }
+          save();render();rebuild();toast('Badge aggiunto');},'pri')),
+      h('h2',null,'Nota'),
+      h('textarea',{rows:'2',placeholder:'Nota per questo giorno',onchange:ev=>{const d=getDay(D,ds);d.n=ev.target.value;cleanDay(D,ds);save();}},e.n||''),
+      h('div',{style:'display:flex;gap:8px;margin-top:14px'},
+        btn('Svuota',()=>{for(const t of T)delete D.days[t];save();render();rebuild();},'del'),
+        h('div',{style:'flex:1'}),btn('Chiudi',closeSheet,'pri')));
+  });
+}
+
+/* --- compilazione automatica --- */
+function openGen(){
+  const {y,m}=S.cal;
+  const st={from:iso(y,m,1),to:iso(y,m,daysInMonth(y,m)),index:S.gen.index,mode:S.gen.mode};
+  openSheet(rebuild=>{
+    if(!D.rotation.length)return h('div',null,h('h3',null,'Compila turni'),h('p',null,'Prima definisci una rotazione in Impostazioni → Rotazione.'),btn('Chiudi',closeSheet,'pri'));
+    const name=id=>{const s=shiftOf(id);return s?s.name:'Riposo';};
+    return h('div',null,h('h3',null,'Compila turni in automatico'),
+      h('div',{class:'card'},
+        h('div',{class:'f'},h('label',null,'Dal'),h('input',{type:'date',value:st.from,onchange:ev=>{st.from=ev.target.value||st.from;}})),
+        h('div',{class:'f'},h('label',null,'Al'),h('input',{type:'date',value:st.to,onchange:ev=>{st.to=ev.target.value||st.to;}})),
+        h('div',{class:'f'},h('label',null,'Prima settimana'),h('select',{value:st.index,onchange:ev=>{st.index=+ev.target.value;}},D.rotation.map((id,i)=>h('option',{value:i},`Sett. ${i+1} – ${name(id)}`)))),
+        h('div',{class:'f'},h('label',null,'Se già compilato'),h('select',{value:st.mode,onchange:ev=>{st.mode=ev.target.value;}},
+          h('option',{value:'empty'},'Riempi solo i giorni vuoti'),h('option',{value:'shift'},'Sostituisci i turni (tieni i badge)'),h('option',{value:'all'},'Sostituisci tutto (anche badge)')))),
+      h('div',{class:'mut'},'La rotazione cambia ogni settimana (lun–dom) e segue i giorni lavorativi di ciascun turno. La modifichi in Impostazioni → Rotazione.'),
+      h('div',{style:'display:flex;gap:8px;margin-top:14px'},btn('Annulla',closeSheet),h('div',{style:'flex:1'}),
+        btn('Compila',()=>{
+          if(st.to<st.from){toast('Intervallo non valido');return;}
+          if(diffDays(st.from,st.to)>800){toast('Intervallo troppo lungo');return;}
+          S.gen={index:st.index,mode:st.mode};
+          const n=generate(D,{from:st.from,to:st.to,startIndex:st.index,mode:st.mode});
+          save();closeSheet();render();toast(n+' turni inseriti');},'pri')));
+  });
+}
+
+/* ===== CONTEGGI ===== */
+function statsView(){
+  const s=S.st;let from,to,title;
+  if(s.mode==='month'){from=iso(s.y,s.m,1);to=iso(s.y,s.m,daysInMonth(s.y,s.m));title=MONTHS[s.m-1]+' '+s.y;}
+  else if(s.mode==='range'){
+    const a=Math.min(s.m1,s.m2),b=Math.max(s.m1,s.m2);
+    from=iso(s.y,a,1);to=iso(s.y,b,daysInMonth(s.y,b));title=MONTHS[a-1].slice(0,3)+' – '+MONTHS[b-1].slice(0,3)+' '+s.y;
+  }
+  else{
+    from=iso(s.y,1,1);to=iso(s.y,12,31);title='Anno '+s.y;
+    const td=todayISO();
+    if(!s.toEnd&&td>=from&&td<to){to=td;title+=' (fino a oggi)';}
+  }
+  const move=n=>{if(s.mode==='month'){s.m+=n;if(s.m<1){s.m=12;s.y--;}if(s.m>12){s.m=1;s.y++;}}else s.y+=n;render();};
+  const A=aggregate(D,from,to);
+  const bal=bankBalance(D,to);
+  const mlist=s.mode==='range'?Array.from({length:Math.abs(s.m2-s.m1)+1},(_,i)=>Math.min(s.m1,s.m2)+i):[1,2,3,4,5,6,7,8,9,10,11,12];
+  const row=(l,v,sub)=>h('div',{class:'row'},h('div',{class:'l'},l,sub&&h('div',{class:'mut'},sub)),h('div',{class:'r'},v));
+  const payLabel=k=>{if(k==='ord')return 'Lavoro ordinario';if(k==='fes')return 'Festività (giornata a paga base)';if(k==='sat')return 'Maggiorazione sabato';const b=badgeOf(k.slice(2));return b?b.name:k;};
+  const wt=k=>k==='ord'?-3:k==='fes'?-2:k==='sat'?-1:0;
+  const keys=Object.keys(A.pay).sort((a,b)=>wt(a)-wt(b));
+  const num=x=>N5.format(Math.round(x*100)/100);
+  const leave=D.badges.filter(b=>b.kind==='leave'),bank=D.badges.filter(b=>b.kind==='bank'),sick=D.badges.filter(b=>b.kind==='sick'),rate=D.badges.filter(b=>b.kind==='rate'),extra=D.badges.filter(b=>b.kind==='extra');
+  return h('div',null,
+    h('div',{class:'seg',style:'margin-bottom:10px'},[['month','Mese'],['year','Anno'],['range','Mesi']].map(([k,l])=>h('button',{class:s.mode===k?'on':'',onclick:()=>{s.mode=k;render();}},l))),
+    s.mode==='range'&&h('div',{class:'card'},h('div',{class:'f'},h('label',{style:'width:30px'},'Da'),
+      h('select',{value:s.m1,onchange:e=>{s.m1=+e.target.value;render();}},MONTHS.map((n,i)=>h('option',{value:i+1},n))),
+      h('label',{style:'width:20px'},'a'),h('select',{value:s.m2,onchange:e=>{s.m2=+e.target.value;render();}},MONTHS.map((n,i)=>h('option',{value:i+1},n))))),
+    s.mode==='year'&&h('div',{class:'seg',style:'margin-bottom:10px'},[['today','Fino a oggi'],['end','Fino a fine anno']].map(([k,l])=>h('button',{class:(s.toEnd?'end':'today')===k?'on':'',onclick:()=>{s.toEnd=k==='end';render();}},l))),
+    h('div',{class:'bar'},btn('‹',()=>move(-1)),h('div',{class:'ttl'},title),btn('›',()=>move(1))),
+    h('div',{style:'margin-bottom:10px'},btn('📋 Report testuale da copiare',()=>openReport(from,to,title),'pri')),
+    h('div',{class:'card'},h('div',{class:'mut'},'Guadagno lordo'),h('div',{class:'big'},eur(A.total)),h('div',{class:'mut'},fh(A.worked)+' lavorate · '+A.workedDays+' giorni')),
+    D.tax.on&&h('div',{class:'card'},h('div',{class:'mut'},'Netto stimato in busta'),h('div',{class:'big pos'},eur(A.net)),h('div',{class:'mut'},'Trattenute '+eur(A.total-A.net))),
+    h('h2',null,'Dettaglio guadagno'),
+    h('div',{class:'card'},keys.length?keys.map(k=>row(payLabel(k),eur(A.pay[k]),A.hrs[k]?fh(A.hrs[k]):null)):h('div',{class:'mut'},'Nessun dato')),
+    D.tax.on&&h('div',null,h('h2',null,'Trattenute'),h('div',{class:'card'},
+      row('Ritenuta ISS',eur(-A.ded.iss)),row('Ritenuta sindacale ISS',eur(-A.ded.sind)),row('Quota Fondiss dipendente',eur(-A.ded.fond)),
+      row('IGR (imposta netta)',eur(-A.ded.igr),'lorda '+eur(A.ded.lorda)+' − detrazioni '+eur(A.ded.lorda-A.ded.igr)))),
+    h('h2',null,'Turni'),
+    h('div',{class:'card'},D.shifts.map(sh=>row(sh.name,(A.shiftCount[sh.id]||0)+'',fh(A.shiftHours[sh.id]||0)))),
+    h('h2',null,'Assenze e voci'),
+    h('div',{class:'card'},
+      leave.map(b=>row(b.name,num(A.badgeDays[b.id]||0)+' gg',fh(A.badgeHours[b.id]||0))),
+      bank.map(b=>row(b.name+' (usata)',fh(A.badgeHours[b.id]||0),num(A.badgeDays[b.id]||0)+' gg')),
+      sick.map(b=>row(b.name,(A.badgeMarked[b.id]||0)+' gg',fh(A.badgeHours[b.id]||0)+' di turno')),
+      A.sickEp?row('Episodi di malattia',A.sickEp+''):null,
+      rate.map(b=>row(b.name,(A.badgeDays[b.id]||0)+' gg')),
+      extra.map(b=>row(b.name,fh(A.badgeHours[b.id]||0))),
+      A.absH?row('Straordinario assorbito dalla banca',fh(A.absH),'non pagato: copre la perdita settimanale'):null,
+      A.fixed&&row('Lavoro in banca ore (non pagato)',fh(A.boaH))),
+    h('h2',null,'Banca ore'),
+    h('div',{class:'card'},
+      row('Guadagnata',h('span',{class:'pos'},fh(A.earned,true))),
+      row('Persa',h('span',{class:'neg'},A.lost?fh(-A.lost):'0h')),
+      row('Goduta (usata come ferie)',fh(A.bankUsed)),
+      row('Saldo del periodo',fh(A.earned-A.lost-A.bankUsed,true)),
+      row('Rimanente totale',h('b',null,fh(bal)),'a fine periodo, incluso saldo iniziale '+fh(D.bankOpening||0))),
+    s.mode!=='month'&&h('div',null,h('h2',null,'Mese per mese'),
+      h('div',{class:'card'},h('table',null,h('tr',null,h('th',null,'Mese'),h('th',null,'Ore'),h('th',null,'Lordo'),h('th',null,'Netto')),
+        mlist.map(m=>{const mf=iso(s.y,m,1),me=iso(s.y,m,daysInMonth(s.y,m)),mn=MONTHS[m-1].slice(0,3);if(mf>to)return h('tr',null,h('td',{class:'mut'},mn),h('td',null,'–'),h('td',null,'–'),h('td',null,'–'));const a=aggregate(D,mf,me<to?me:to);return h('tr',null,h('td',null,mn),h('td',null,fh(a.worked)),h('td',null,eur(a.total)),h('td',null,eur(a.net)));}))),
+      h('h2',null,'Banca ore mese per mese'),
+      h('div',{class:'card'},h('table',null,h('tr',null,h('th',null,'Mese'),h('th',null,'Matur.'),h('th',null,'Persa'),h('th',null,'Goduta'),h('th',null,'Saldo')),
+        mlist.map(m=>{const mf=iso(s.y,m,1),me=iso(s.y,m,daysInMonth(s.y,m)),mn=MONTHS[m-1].slice(0,3);if(mf>to)return h('tr',null,h('td',{class:'mut'},mn),h('td',null,'–'),h('td',null,'–'),h('td',null,'–'),h('td',null,'–'));const e2=me<to?me:to,a=aggregate(D,mf,e2);return h('tr',null,h('td',null,mn),h('td',null,fh(a.earned,true)),h('td',null,a.lost?fh(-a.lost):'0h'),h('td',null,fh(a.bankUsed)),h('td',null,fh(bankBalance(D,e2))));})))),
+    h('div',{class:'mut',style:'margin:8px 4px'},'Importi lordi, calcolati con le tariffe impostate.'));
+}
+
+/* ===== REPORT TESTUALE ===== */
+function buildReport(from,to,title,detail){
+  const y=+from.slice(0,4),m1=+from.slice(5,7),m2=+to.slice(5,7);
+  const base=(D.rates.find(r=>r.id==='base')||{}).value||0;
+  const f1=x=>N5.format(Math.round(x*100)/100);
+  const sh=D.shifts,L=[];
+  L.push('REPORT TURNI – '+title);
+  L.push('Paga '+N5.format(base)+' €/h · '+(D.monthly.on?'monte ore '+D.monthly.hours+' h/mese':'paga a ore')+' · saldo iniziale banca '+fh(D.bankOpening||0));
+  L.push('Regole banca: '+D.bankRules.map(r=>fh(r.hours)+' → '+fh(r.delta,true)).join(' · '));
+  L.push('');
+  L.push('MESE | Gg | Ore | '+sh.map(short3).join(' | ')+' | Ferie h | BO usata h | Mal h | Str h | Lordo | Netto');
+  const row=(lab,a)=>lab+' | '+a.workedDays+' | '+f1(a.worked)+' | '+sh.map(x=>a.shiftCount[x.id]||0).join(' | ')+' | '+f1(a.leaveH)+' | '+f1(a.bankUsed)+' | '+f1(a.sickH)+' | '+f1(a.extraH)+' | '+f1(a.total)+' | '+f1(a.net);
+  for(let m=m1;m<=m2;m++){const mf=iso(y,m,1),me=iso(y,m,daysInMonth(y,m));L.push(row(MONTHS[m-1].slice(0,3),aggregate(D,mf,me<to?me:to)));}
+  L.push(row('TOT',aggregate(D,from,to)));
+  L.push('');
+  L.push('BANCA ORE: mese | maturata | persa | goduta | saldo cumulato');
+  for(let m=m1;m<=m2;m++){const mf=iso(y,m,1),me=iso(y,m,daysInMonth(y,m)),e2=me<to?me:to,a=aggregate(D,mf,e2);L.push(MONTHS[m-1].slice(0,3)+' | '+fh(a.earned,true)+' | '+(a.lost?fh(-a.lost):'0h')+' | '+fh(a.bankUsed)+' | '+fh(bankBalance(D,e2)));}
+  const T=aggregate(D,from,to);
+  L.push('TOT | '+fh(T.earned,true)+' | '+(T.lost?fh(-T.lost):'0h')+' | '+fh(T.bankUsed)+' | '+fh(bankBalance(D,to)));
+  if(detail){
+    L.push('');L.push('DETTAGLIO GIORNI: data | turno | ore lavorate | badge | banca');
+    const sm=sickMap(D),wm=weekMap(D,sm);
+    for(const ds of Object.keys(D.days).sort()){
+      if(ds<from||ds>to)continue;
+      const e=D.days[ds];if(!e.s&&!(e.b&&e.b.length))continue;
+      const r=calcDay(D,ds,sm,wm),s0=shiftOf(e.s);
+      const bd=(e.b||[]).map(x=>{const b=badgeOf(x.id);return b?b.short+(x.h==null?'':'('+f1(x.h)+'h)'):'';}).join(',');
+      L.push(ds.slice(8,10)+'/'+ds.slice(5,7)+' '+WD[(dow(ds)+6)%7]+' | '+(s0?short3(s0):'-')+' | '+f1(r.worked)+' | '+(bd||'-')+' | '+(r.bankDelta?fh(r.bankDelta,true):'')+(r.bankH?(r.bankDelta?' ':'')+'uso '+fh(r.bankH):'')+(r.extraAbs?' (straord. assorbito '+f1(r.extraAbs)+'h)':''));
+    }
+  }
+  return L.join('\n');
+}
+function openReport(from,to,title){
+  const st={detail:true};
+  openSheet(rebuild=>{
+    const txt=buildReport(from,to,title,st.detail);
+    const ta=h('textarea',{rows:'16',readonly:true,wrap:'off',style:'font-family:ui-monospace,Menlo,monospace;font-size:11px;white-space:pre'},txt);
+    return h('div',null,h('h3',null,'Report: '+title),
+      h('div',{class:'row'},h('div',{class:'l'},'Includi dettaglio giorni'),h('input',{type:'checkbox',checked:st.detail,onchange:e=>{st.detail=e.target.checked;rebuild();}})),
+      ta,
+      h('div',{style:'display:flex;gap:8px;margin-top:12px'},btn('Chiudi',closeSheet),h('div',{style:'flex:1'}),
+        btn('Copia',()=>{
+          const fb=()=>{try{ta.focus();ta.select();ta.setSelectionRange(0,txt.length);document.execCommand('copy');toast('Copiato');}catch(e){toast('Seleziona il testo e copia a mano');}};
+          try{navigator.clipboard.writeText(txt).then(()=>toast('Copiato'),fb);}catch(e){fb();}
+        },'pri')));
+  });
+}
+
+/* ===== IMPOSTAZIONI ===== */
+function inp(obj,key,o){o=o||{};
+  return h('input',{type:o.num?'number':(o.type||'text'),step:o.num?'any':null,inputmode:o.num?'decimal':null,value:obj[key]==null?'':obj[key],
+    onchange:e=>{let v=e.target.value;if(o.num){v=parseFloat(String(v).replace(',','.'));if(isNaN(v))v=0;}obj[key]=v;save();o.after&&o.after(v);}});
+}
+function setView(){
+  const KINDS={sick:'Malattia / infortunio (indennità a % per giorno)',leave:'Ferie / permesso (copre ore, pagate)',bank:'Banca ore (copre ore, scala dal saldo)',rate:'Tariffa sostitutiva (es. festivi)',extra:'Ore extra (es. straordinari)'};
+  const rateUsed=id=>D.badges.some(b=>b.rate===id);
+  // Turni
+  const shiftCards=D.shifts.map(s=>{
+    const info=h('span',{class:'mut'});
+    const upd=()=>{const hr=shiftHours(s);const r=D.bankRules.find(q=>Math.abs(q.hours-hr)<0.01);info.textContent=fh(hr)+' · banca ore: '+(r?fh(r.delta,true):'nessuna regola');};
+    upd();
+    return h('div',{class:'card'},
+      h('div',{class:'f'},h('label',null,'Nome'),inp(s,'name'),h('input',{type:'color',value:s.color,onchange:e=>{s.color=e.target.value;save();}})),
+      h('div',{class:'f'},h('label',null,'Inizio'),inp(s,'start',{type:'time',after:upd}),h('label',{style:'width:34px'},'Fine'),inp(s,'end',{type:'time',after:upd})),
+      h('div',{class:'f'},h('label',null,'Giorni'),h('div',{class:'days'},WD1.map((l,i)=>{const d=(i+1)%7;return h('button',{class:s.days.includes(d)?'on':'',onclick:()=>{s.days=s.days.includes(d)?s.days.filter(x=>x!==d):s.days.concat(d);save();render();}},l);}))),
+      h('div',{class:'row'},h('div',{class:'l'},info),btn('Elimina',()=>{if(confirm('Eliminare il turno "'+s.name+'"?')){D.shifts=D.shifts.filter(x=>x!==s);D.rotation=D.rotation.map(id=>id===s.id?'':id);save();render();}},'del sm')));
+  });
+  // Tariffe
+  const rateRows=D.rates.map(r=>h('div',{class:'f'},inp(r,'name'),h('div',{style:'width:120px;flex:none'},inp(r,'value',{num:true})),
+    (r.id==='base'||r.id==='sat')?h('span',{style:'width:56px;flex:none'}):btn('✕',()=>{if(rateUsed(r.id)){toast('Voce usata da un badge');return;}D.rates=D.rates.filter(x=>x!==r);save();render();},'del sm')));
+  // Badge
+  const badgeCards=D.badges.map(b=>h('div',{class:'card'},
+    h('div',{class:'f'},h('label',null,'Nome'),inp(b,'name'),h('input',{type:'color',value:b.color,onchange:e=>{b.color=e.target.value;save();}})),
+    h('div',{class:'f'},h('label',null,'Sigla'),h('div',{style:'width:90px;flex:none'},inp(b,'short')),h('label',{style:'width:56px'},'Tipo'),
+      h('select',{value:b.kind,onchange:e=>{b.kind=e.target.value;save();render();}},Object.entries(KINDS).map(([k,l])=>h('option',{value:k},l)))),
+    h('div',{class:'f'},h('label',null,'Tariffa'),h('select',{value:b.rate,onchange:e=>{b.rate=e.target.value;save();}},D.rates.map(r=>h('option',{value:r.id},r.name+' ('+N5.format(r.value)+')')))),
+    b.kind==='sick'&&h('div',{class:'f'},h('label',null,'Regola'),h('select',{value:b.policy,onchange:e=>{b.policy=e.target.value;save();}},D.sick.policies.map(p=>h('option',{value:p.id},p.name)))),
+    b.kind==='rate'&&h('div',{class:'row'},h('div',{class:'l'},'Giornata già nella paga fissa (voce Festività)'),h('input',{type:'checkbox',checked:b.inclBase!==false,onchange:e=>{b.inclBase=e.target.checked;save();}})),
+    h('div',{style:'text-align:right'},btn('Elimina',()=>{if(confirm('Eliminare il badge "'+b.name+'"? Verrà tolto anche dai giorni.')){D.badges=D.badges.filter(x=>x!==b);for(const k in D.days){D.days[k].b=(D.days[k].b||[]).filter(q=>q.id!==b.id);cleanDay(D,k);}save();render();}},'del sm'))));
+  // Banca ore
+  const ruleRows=D.bankRules.map((r,i)=>h('div',{style:'border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:6px'},
+    h('div',{class:'f'},h('label',{style:'width:70px'},'Turno di'),h('div',{style:'width:80px;flex:none'},inp(r,'hours',{num:true})),h('label',{style:'width:50px'},'ore →'),h('div',{style:'width:80px;flex:none'},inp(r,'delta',{num:true})),h('span',{class:'mut',style:'flex:1'},'h banca'),btn('✕',()=>{D.bankRules.splice(i,1);save();render();},'del sm')),
+    h('div',{class:'row'},h('div',{class:'l'},'Perdita una volta a settimana',h('div',{class:'mut'},'solo se negativa; lo straordinario della stessa settimana la copre (e non viene pagato)')),h('input',{type:'checkbox',checked:!!r.weekly,onchange:e=>{r.weekly=e.target.checked;save();}}))));
+  // Rotazione
+  const rotRows=D.rotation.map((id,i)=>h('div',{class:'f'},h('label',{style:'width:70px'},'Sett. '+(i+1)),
+    h('select',{value:id,onchange:e=>{D.rotation[i]=e.target.value;save();}},D.shifts.map(s=>h('option',{value:s.id},s.name)),h('option',{value:''},'Riposo')),
+    btn('↑',()=>{if(i>0){[D.rotation[i-1],D.rotation[i]]=[D.rotation[i],D.rotation[i-1]];save();render();}},'sm'),
+    btn('↓',()=>{if(i<D.rotation.length-1){[D.rotation[i+1],D.rotation[i]]=[D.rotation[i],D.rotation[i+1]];save();render();}},'sm'),
+    btn('✕',()=>{D.rotation.splice(i,1);save();render();},'del sm')));
+  const polCards=D.sick.policies.map(P=>h('div',{class:'card'},
+    h('div',{class:'f'},h('label',{style:'width:60px'},'Nome'),inp(P,'name')),
+    P.tiers.map((t,i)=>h('div',{class:'f'},h('label',{style:'width:34px'},'Dal'),h('div',{style:'width:62px;flex:none'},inp(t,'from',{num:true})),h('label',{style:'width:26px'},'al'),h('div',{style:'width:62px;flex:none'},inp(t,'to',{num:true})),h('label',{style:'width:26px'},'gg'),h('div',{style:'width:62px;flex:none'},inp(t,'pct',{num:true})),h('span',{class:'mut'},'%'),btn('✕',()=>{P.tiers.splice(i,1);save();render();},'del sm'))),
+    btn('+ Fascia',()=>{const l=P.tiers[P.tiers.length-1];P.tiers.push({from:l?l.to+1:1,to:(l?l.to:0)+30,pct:100});save();render();},'sm'),
+    h('div',{class:'row',style:'margin-top:8px'},h('div',{class:'l'},'Episodi brevi con % ridotta'),h('input',{type:'checkbox',checked:P.short.on,onchange:e=>{P.short.on=e.target.checked;save();}})),
+    h('div',{class:'f'},h('label',{style:'width:130px'},'Se dura meno di (gg)'),inp(P.short,'under',{num:true})),
+    h('div',{class:'f'},h('label',{style:'width:130px'},'Primi (gg)'),inp(P.short,'first',{num:true})),
+    h('div',{class:'f'},h('label',{style:'width:130px'},'Pagati al (%)'),inp(P.short,'pct',{num:true})),
+    h('div',{style:'text-align:right'},btn('Elimina regola',()=>{if(D.badges.some(b=>b.policy===P.id)){toast('Regola usata da un badge');return;}D.sick.policies=D.sick.policies.filter(x=>x!==P);save();render();},'del sm'))));
+  return h('div',null,h('h1',null,'Impostazioni'),
+    h('div',{class:'mut',style:'margin:0 4px'},'Tutti i dati restano su questo telefono.'),
+    h('h2',null,'Turni'),shiftCards,btn('+ Aggiungi turno',()=>{D.shifts.push({id:uid('s'),name:'Nuovo turno',start:'08:00',end:'16:00',days:[1,2,3,4,5],color:'#14b8a6'});save();render();}),
+    h('h2',null,'Paghe e tariffe (€/h)'),h('div',{class:'card'},rateRows),btn('+ Aggiungi voce',()=>{D.rates.push({id:uid('r'),name:'Nuova tariffa',value:0});save();render();}),
+    h('div',{class:'mut',style:'margin:6px 4px'},'“Paga oraria” e “Maggiorazione sabato” sono fisse: il sabato si paga paga oraria + maggiorazione. Il resto è libero.'),
+    h('h2',null,'Badge'),badgeCards,btn('+ Aggiungi badge',()=>{D.badges.push({id:uid('b'),name:'Nuovo badge',kind:'rate',rate:'base',color:'#64748b',short:'NEW'});save();render();}),
+    h('h2',null,'Modalità paga'),
+    h('div',{class:'card'},
+      h('div',{class:'row'},h('div',{class:'l'},'Stipendio mensile fisso',h('div',{class:'mut'},'Come in busta paga: lavoro ordinario = monte ore − festività − ferie − permessi banca ore − straordinari. Il monte ore vale per ogni mese con turni.')),h('input',{type:'checkbox',checked:D.monthly.on,onchange:e=>{D.monthly.on=e.target.checked;save();}})),
+      h('div',{class:'f'},h('label',{style:'width:120px'},'Monte ore mese'),inp(D.monthly,'hours',{num:true}))),
+    h('h2',null,'Regole malattia (indennità ISS)'),polCards,
+    btn('+ Aggiungi regola malattia',()=>{D.sick.policies.push({id:uid('p'),name:'Nuova regola',tiers:[{from:1,to:365,pct:100}],short:{on:false,under:5,first:2,pct:50}});save();render();}),
+    h('div',{class:'mut',style:'margin:6px 4px'},'Predefinito (ISS San Marino): 86% dal 1° al 14° giorno, 100% dal 15° al 180°, 86% dal 181° al 365°; episodi sotto i 5 giorni: 50% i primi 2 giorni, poi 86%. I giorni si contano dall’inizio dell’episodio, anche nei weekend o festivi senza turno (pause fino a 3 giorni). Verifica sulla tua busta: il contratto aziendale può integrare.'),
+    h('h2',null,'Trattenute e netto'),
+    h('div',{class:'card'},
+      h('div',{class:'row'},h('div',{class:'l'},'Calcola il netto',h('div',{class:'mut'},'Ritenute San Marino: ISS, Fondiss e IGR su base annualizzata, come in busta paga.')),h('input',{type:'checkbox',checked:D.tax.on,onchange:e=>{D.tax.on=e.target.checked;save();}})),
+      [['iss','Ritenuta ISS %'],['sind','Sindacale ISS %'],['fondiss','Fondiss dip. %'],['altre','Altre deduzioni IGR %'],['months','Mensilità (annualizz.)'],['smac','Detrazione SMAC €/mese'],['altreDetr','Altre detrazioni €/mese']].map(([k,l])=>
+        h('div',{class:'f'},h('label',{style:'width:150px'},l),inp(D.tax,k,{num:true}))),
+      h('div',{class:'mut'},'“Altre deduzioni IGR” (6,6%) e la detrazione SMAC sono ricavate dalla busta di settembre 2026: la SMAC dipende dall\'opzione che hai scelto col datore di lavoro.')),
+    h('div',{class:'mut',style:'margin:6px 4px'},'Scaglioni IGR (reddito annuo)'),
+    h('div',{class:'card'},D.tax.brackets.map((b,i,arr)=>h('div',{class:'f'},h('label',{style:'width:70px'},i<arr.length-1?'Fino a':'Oltre'),
+      i<arr.length-1?inp(b,'upTo',{num:true}):h('span',{class:'mut',style:'flex:1'},'€ '+(arr[i-1]?arr[i-1].upTo:0)),h('label',{style:'width:70px'},'aliq. %'),h('div',{style:'width:80px;flex:none'},inp(b,'rate',{num:true}))))),
+    h('h2',null,'Banca ore'),
+    h('div',{class:'card'},h('div',{class:'f'},h('label',{style:'width:120px'},'Saldo iniziale (h)'),inp(D,'bankOpening',{num:true})),ruleRows,
+      h('div',{class:'mut'},'Il turno effettivamente lavorato (ore dopo ferie/banca) viene confrontato con queste regole. Valori negativi = ore perse. Con “una volta a settimana” la perdita si applica una sola volta per settimana (lun–dom), anche se hai più turni da quelle ore.')),
+    btn('+ Aggiungi regola',()=>{D.bankRules.push({hours:8,delta:0});save();render();}),
+    h('h2',null,'Rotazione settimanale'),h('div',{class:'card'},rotRows.length?rotRows:h('div',{class:'mut'},'Nessuna settimana')),
+    btn('+ Aggiungi settimana',()=>{D.rotation.push(D.shifts.length?D.shifts[0].id:'');save();render();}),
+    h('h2',null,'Dati'),
+    h('div',{class:'card'},
+      h('div',{class:'row'},h('div',{class:'l'},'Esporta backup'),btn('Esporta',exportData,'sm')),
+      h('div',{class:'row'},h('div',{class:'l'},'Copia backup negli appunti'),btn('Copia',()=>{try{navigator.clipboard.writeText(JSON.stringify(D)).then(()=>toast('Backup copiato'),()=>toast('Copia non consentita'));}catch(e){toast('Copia non consentita');}},'sm')),
+      h('div',{class:'row'},h('div',{class:'l'},'Incolla backup (da testo copiato)'),btn('Incolla',openPaste,'sm')),
+      h('div',{class:'row'},h('div',{class:'l'},'Importa backup'),h('input',{type:'file',accept:'application/json,.json',style:'max-width:60%',onchange:importData})),
+      h('div',{class:'row'},h('div',{class:'l'},'Ripristina tutto'),btn('Reset',()=>{if(confirm('Cancellare TUTTI i dati e ripartire dalle impostazioni iniziali?')){D=defaults();save();render();}},'del sm'))),
+    h('div',{class:'mut',style:'margin:6px 4px'},'Fai ogni tanto un backup: se cancelli i dati del sito da Safari, i turni si perdono.'));
+}
+async function exportData(){
+  const f=new File([JSON.stringify(D,null,1)],'turni-backup-'+todayISO()+'.json',{type:'application/json'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]});return;}catch(e){if(e.name==='AbortError')return;}}
+  const a=h('a',{href:URL.createObjectURL(f),download:f.name});document.body.append(a);a.click();a.remove();
+}
+function openPaste(){
+  openSheet(rebuild=>{
+    const ta=h('textarea',{rows:'10',placeholder:'Incolla qui il backup (testo JSON)',style:'font-size:12px'});
+    return h('div',null,h('h3',null,'Incolla backup'),ta,
+      h('div',{style:'display:flex;gap:8px;margin-top:12px'},btn('Annulla',closeSheet),h('div',{style:'flex:1'}),
+        btn('Importa',()=>{try{const o=JSON.parse(ta.value);if(!o.shifts||!o.days)throw 0;D=migrate(Object.assign(defaults(),o,{mig:o.mig||0}));save();closeSheet();render();toast('Backup importato');}catch(x){toast('Testo non valido');}},'pri')));
+  });
+}
+function importData(e){
+  const f=e.target.files[0];if(!f)return;
+  f.text().then(t=>{try{const o=JSON.parse(t);if(!o.shifts||!o.days)throw 0;D=migrate(Object.assign(defaults(),o,{mig:o.mig||0}));save();render();toast('Backup importato');}catch(x){toast('File non valido');}});
+}
+
+/* ===== Avvio ===== */
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();
+</script>
+</body>
+</html>
