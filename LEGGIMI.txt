@@ -1,0 +1,21 @@
+TURNI - calendario turni per iPhone (web app, dati solo sul telefono)
+
+INSTALLAZIONE SU IPHONE
+1. Apri l'indirizzo della pagina con Safari.
+2. Tocca Condividi, poi "Aggiungi a Home".
+3. Apri l'app dall'icona sulla Home.
+
+PRIMO AVVIO
+- I valori personali (paghe, banca ore, detrazioni) NON sono nel codice.
+- Importa il file privato "turni-impostazioni-personali.json":
+  Impostazioni -> Dati -> Importa backup (oppure Incolla backup).
+- Non pubblicare mai quel file.
+
+BACKUP
+- Impostazioni -> Dati -> Esporta backup (o Copia backup) ogni tanto.
+- Se cancelli i dati del sito da Safari, i turni si perdono.
+
+AGGIORNARE
+- Sostituisci i file nel repository. Se cambi index.html, aumenta
+  il numero in sw.js (const V='turni-v1' -> 'turni-v2') per far
+  scaricare la versione nuova al telefono.
