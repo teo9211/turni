@@ -44,6 +44,8 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)
 .cell.blank{background:none}
 .cell .n{font-size:12px;font-weight:600}
 .cell.sun .n{color:var(--red)}
+.cell.hol{background:color-mix(in srgb,var(--red) 16%,var(--card))}
+.cell.hol .n{color:var(--red)}
 .pill{display:block;font-size:10px;color:#fff;border-radius:5px;padding:1px 3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
 .bd{display:inline-block;font-size:9px;color:#fff;border-radius:4px;padding:0 3px;margin:2px 1px 0 0}
 .seg{display:flex;background:var(--bg);border-radius:9px;padding:2px;gap:2px}
@@ -119,7 +121,7 @@ function defaults(){return{
   bankRules:[],
   bankOpening:0,
   monthly:{on:false,hours:0},
-  mig:4,
+  mig:8,
   sick:{policies:[
     {id:'mal',name:'Malattia comune (ISS)',tiers:[{from:1,to:14,pct:86},{from:15,to:180,pct:100},{from:181,to:365,pct:86}],short:{on:false,under:5,first:2,pct:50}},
     {id:'inf',name:'Infortunio / malattia professionale',tiers:[{from:1,to:365,pct:100}],short:{on:false,under:5,first:2,pct:50}}
@@ -127,6 +129,28 @@ function defaults(){return{
   tax:{on:true,iss:7.4,sind:0.4,fondiss:2.5,altre:0,months:13,smac:0,altreDetr:0,
     brackets:[{upTo:10000,rate:9},{upTo:18000,rate:13},{upTo:28000,rate:17},{upTo:38000,rate:21},{upTo:50000,rate:25},{upTo:65000,rate:28},{upTo:80000,rate:31},{upTo:null,rate:35}]},
   rotation:['mat','pom','gio'],
+  bonuses:[],
+  extras:[],
+  night:{on:false,from:'22:00',to:'06:00',kind:'extra',rate:0},
+  holidays:[
+    {id:'h_agata',name:'Sant\'Agata',md:'02-05',on:true},
+    {id:'h_arengo',name:'Anniversario Arengo',md:'03-25',on:true},
+    {id:'h_reg1',name:'Insediamento Capitani Reggenti',md:'04-01',on:true},
+    {id:'h_corpus',name:'Corpus Domini',md:'corpus',on:true},
+    {id:'h_fasc',name:'Caduta del Fascismo',md:'07-28',on:true},
+    {id:'h_sm',name:'San Marino, Patrono',md:'09-03',on:true},
+    {id:'h_reg2',name:'Insediamento Capitani Reggenti',md:'10-01',on:true},
+    {id:'c_cap',name:'Capodanno',md:'01-01',on:false},
+    {id:'c_epi',name:'Epifania',md:'01-06',on:false},
+    {id:'c_pas',name:'Lunedì di Pasqua',md:'pasquetta',on:false},
+    {id:'c_lav',name:'Festa del Lavoro',md:'05-01',on:false},
+    {id:'c_fer',name:'Ferragosto',md:'08-15',on:false},
+    {id:'c_san',name:'Ognissanti',md:'11-01',on:false},
+    {id:'c_imm',name:'Immacolata',md:'12-08',on:false},
+    {id:'c_nat',name:'Natale',md:'12-25',on:false},
+    {id:'c_ste',name:'Santo Stefano',md:'12-26',on:false}
+  ],
+  itSim:{franchigia:10000,method:'rip',fondiss:true,cuneo:true,addReg:0,addCom:0,altreDetr:0,rettifica:0},
   days:{}
 };}
 
@@ -190,13 +214,101 @@ function weekMap(D,sm){
   return{loss,abs};
 }
 
+/* ===== Festività (caselle rosse) ===== */
+function easterOf(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3);
+  const k=(19*a+b-d-g+15)%30,i=Math.floor(c/4),j=c%4,l=(32+2*e+2*i-k-j)%7,m=Math.floor((a+11*k+22*l)/451);
+  const t=k+l-7*m+114,mo=Math.floor(t/31),da=(t%31)+1;
+  return y+'-'+String(mo).padStart(2,'0')+'-'+String(da).padStart(2,'0');
+}
+function holidayName(D,ds){
+  const hl=D.holidays||[];if(!hl.length)return null;
+  const y=+ds.slice(0,4),md=ds.slice(5);let ez=null;
+  for(const x of hl){
+    if(!x.on)continue;
+    if(x.md==='corpus'||x.md==='pasquetta'){ez=ez||easterOf(y);if(ds===addDays(ez,x.md==='corpus'?60:1))return x.name;}
+    else if(x.md===md)return x.name;
+  }
+  return null;
+}
+
+/* ===== Simulazione tasse Italia (stima) ===== */
+const IT_BR=[[28000,23],[50000,33],[Infinity,43]];
+function irpefLorda(x){let t=0,p=0;for(const [top,r] of IT_BR){if(x>p)t+=(Math.min(x,top)-p)*r/100;p=top;if(x<=top)break;}return t;}
+function detrLav(R,cuneo){
+  let d=0;
+  if(R<=15000)d=1955;else if(R<=28000)d=1910+1190*(28000-R)/13000;else if(R<=50000)d=1910*(50000-R)/22000;
+  if(R>25000&&R<=35000)d+=65;
+  if(cuneo){if(R>20000&&R<=32000)d+=1000;else if(R>32000&&R<40000)d+=1000*(40000-R)/8000;}
+  return d;
+}
+function itaxSim(D,A){
+  const S=D.itSim||{};
+  const lordo=Math.max(0,A.total-A.sim.tfr+(+S.rettifica||0));
+  const fr=Math.min(+S.franchigia||0,lordo);
+  const compl=lordo-fr;
+  const contr=A.ded.iss+A.ded.sind+A.sim.iss+A.sim.sind;
+  const fond=S.fondiss===false?0:Math.min(A.ded.fond+A.sim.fond,5164.57);
+  const imp=Math.max(0,compl-contr-fond);
+  const lorda=irpefLorda(imp);
+  const detr=detrLav(compl,S.cuneo!==false)+(+S.altreDetr||0);
+  const netta=Math.max(0,lorda-detr);
+  const igr=A.ded.igr+A.sim.igr;
+  const ratio=S.method==='int'||lordo<=0?1:(lordo-fr)/lordo;
+  const cred=Math.min(netta,igr*ratio);
+  const dov=netta-cred;
+  const reg=imp*(+S.addReg||0)/100,com=imp*(+S.addCom||0)/100;
+  return {lordo,fr,compl,contr,fond,imp,lorda,detr,netta,igr,cred,dov,reg,com,tot:dov+reg+com};
+}
+
+/* ===== Bonus con condizione ===== */
+/* ore del turno che cadono nella fascia [from,to) (anche a cavallo della mezzanotte) */
+function winHours(sh,win){
+  if(!win||!win.from||!win.to)return shiftHours(sh);
+  let s=toMin(sh.start),e=toMin(sh.end);if(e<=s)e+=1440;
+  let a=toMin(win.from),b=toMin(win.to);if(b<=a)b+=1440;
+  let t=0;for(const o of [-1440,0,1440])t+=Math.max(0,Math.min(e,b+o)-Math.max(s,a+o));
+  return t/60;
+}
+/* assegnazioni: [{ds,id,amount}] — con 'una volta per periodo' il bonus cade nel giorno in cui si raggiunge la soglia */
+function bonusAwards(D,sm,wm){
+  const out=[],bl=D.bonuses||[];if(!bl.length)return out;
+  sm=sm||sickMap(D);if(wm===undefined)wm=weekMap(D,sm);
+  const days=Object.keys(D.days).sort();
+  const base=(D.rates.find(q=>q.id==='base')||{value:0}).value;
+  for(const b of bl){
+    const c=b.cond||{},groups={};
+    const key=ds=>b.period==='year'?ds.slice(0,4):b.period==='month'?ds.slice(0,7):mondayOf(ds);
+    for(const ds of days){
+      const e=D.days[ds];if(!e||!e.s)continue;
+      if(c.shift&&c.shift!==e.s)continue;
+      if(c.days&&c.days.length&&!c.days.includes(dow(ds)))continue;
+      const sh=D.shifts.find(q=>q.id===e.s);if(!sh)continue;
+      const r=calcDay(D,ds,sm,wm);if(!(r.worked>0)||!(r.H0>0))continue;
+      const hrs=winHours(sh,c.window)*Math.min(1,r.worked/r.H0);
+      if(c.window&&c.window.from&&hrs<=1e-9)continue;
+      (groups[key(ds)]=groups[key(ds)]||[]).push({ds,hrs});
+    }
+    const amt=hh=>b.type==='hourly'?hh*(b.amount||0):b.type==='pct'?hh*base*(b.amount||0)/100:(b.amount||0);
+    for(const k in groups){
+      const g=groups[k],minC=c.minCount||0,minH=c.minHours||0;
+      let n=0,hs=0,hit=-1;
+      g.forEach((x,i)=>{n++;hs+=x.hrs;if(hit<0&&n>=minC&&hs>=minH-1e-9)hit=i;});
+      if(hit<0)continue;
+      if(b.once!==false)out.push({ds:g[hit].ds,id:b.id,amount:amt(g.reduce((a,x)=>a+x.hrs,0))});
+      else for(const x of g)out.push({ds:x.ds,id:b.id,amount:amt(x.hrs)});
+    }
+  }
+  return out;
+}
+
 /* ===== Calcolo giornata ===== */
 const add=(o,k,v)=>{o[k]=(o[k]||0)+v;};
 function calcDay(D,ds,sm,wm){
   sm=sm||sickMap(D);
   if(wm===undefined)wm=weekMap(D,sm);
   const e=D.days[ds];
-  const r={ds,shiftId:null,H:0,worked:0,counted:false,leaveH:0,bankH:0,extraH:0,pay:{},total:0,bankDelta:0,hoursBy:{},sickH:0,rule:null,lossH:0,fesRem:0,H0:0,extraRaw:0,extraAbs:0,rateH:0,satH:0,festBase:false,rateId:null};
+  const r={ds,shiftId:null,H:0,worked:0,counted:false,leaveH:0,bankH:0,extraH:0,pay:{},total:0,bankDelta:0,hoursBy:{},sickH:0,rule:null,lossH:0,fesRem:0,H0:0,extraRaw:0,extraAbs:0,rateH:0,satH:0,nightH:0,festBase:false,rateId:null};
   if(!e)return r;
   const rate=id=>{const x=D.rates.find(q=>q.id===id);return x?x.value:0;};
   const shift=D.shifts.find(s=>s.id===e.s);
@@ -226,6 +338,11 @@ function calcDay(D,ds,sm,wm){
     else{
       add(r.pay,'ord',r.worked*rate('base'));
       if(dow(ds)===6){add(r.pay,'sat',r.worked*rate('sat'));r.satH=r.worked;}
+      const N=D.night;
+      if(N&&N.on&&shift&&H0>0){
+        const nh=winHours(shift,{from:N.from,to:N.to})*Math.min(1,r.worked/H0);
+        if(nh>1e-9){const ex=N.kind==='total'?Math.max(0,(+N.rate||0)-rate('base')):(+N.rate||0);add(r.pay,'night',nh*ex);r.nightH=nh;}
+      }
     }
     const rule=ruleFor(D,r.worked);
     if(rule&&!(rule.weekly&&rule.delta<0)){r.rule=rule;r.bankDelta=rule.delta;}
@@ -243,20 +360,23 @@ function calcDay(D,ds,sm,wm){
 }
 
 function aggregate(D,from,to){
-  const A={from,to,shiftCount:{},shiftHours:{},worked:0,leaveH:0,bankUsed:0,extraH:0,pay:{},hrs:{},total:0,earned:0,lost:0,badgeDays:{},badgeHours:{},workedDays:0,boaH:0,sickDays:0,sickEp:0,sickH:0,absH:0,badgeMarked:{},fixed:false,net:0,ded:{iss:0,sind:0,fond:0,lorda:0,igr:0}};
+  const A={from,to,shiftCount:{},shiftHours:{},worked:0,leaveH:0,bankUsed:0,extraH:0,pay:{},hrs:{},total:0,earned:0,lost:0,badgeDays:{},badgeHours:{},workedDays:0,boaH:0,sickDays:0,sickEp:0,sickH:0,absH:0,badgeMarked:{},fixed:false,bonusTotal:0,net:0,ded:{iss:0,sind:0,fond:0,lorda:0,igr:0,extra:0},sim:{tfr:0,iss:0,sind:0,fond:0,igr:0}};
   const fixed=!!(D.monthly&&D.monthly.on);A.fixed=fixed;
   const base=(D.rates.find(q=>q.id==='base')||{value:0}).value;
-  const months={},sm=sickMap(D),wm=weekMap(D,sm),eps=new Set();
+  const months={};
+  const getM=k=>months[k]||(months[k]={pay:{},hrs:{},fesH:0,noFestH:0,leaveH:0,bankH:0,extraH:0,sickH:0,hasShift:false,noTax:0,cust:0,custTax:0,xG:0,xN:0});
+  const sm=sickMap(D),wm=weekMap(D,sm),eps=new Set();
   for(const ds of Object.keys(D.days)){
     if(ds<from||ds>to)continue;
     const e=D.days[ds],r=calcDay(D,ds,sm,wm),mk=ds.slice(0,7);
-    const M=months[mk]||(months[mk]={pay:{},hrs:{},fesH:0,noFestH:0,leaveH:0,bankH:0,extraH:0,sickH:0,hasShift:false});
+    const M=getM(mk);
     if(r.shiftId)M.hasShift=true;
     if(r.counted){A.shiftCount[r.shiftId]=(A.shiftCount[r.shiftId]||0)+1;add(A.shiftHours,r.shiftId,r.worked);A.workedDays++;}
     A.worked+=r.worked;A.absH+=r.extraAbs;A.sickH+=r.sickH;A.leaveH+=r.leaveH;A.bankUsed+=r.bankH;A.extraH+=r.extraH;
     for(const k in r.pay){if(fixed&&k==='ord')continue;add(M.pay,k,r.pay[k]);}
     if(!fixed&&r.worked>0&&!r.rateH)add(M.hrs,'ord',r.worked);
     if(r.satH)add(M.hrs,'sat',r.satH);
+    if(r.nightH)add(M.hrs,'night',r.nightH);
     if(r.rateH)add(M.hrs,'b:'+r.rateId,r.rateH);
     if(r.lossH&&!fixed){const bb=D.badges.find(q=>q.kind==='bank');if(bb)add(M.hrs,'b:'+bb.id,r.lossH);}
     if(r.fesRem)add(M.hrs,'fes',r.fesRem);
@@ -272,6 +392,26 @@ function aggregate(D,from,to){
       add(A.badgeDays,b.id,b.kind==='rate'?1:(b.kind==='extra'?0:(r.H?hh/r.H:0)));
     }
   }
+  if((D.bonuses||[]).length){
+    for(const a of bonusAwards(D,sm,wm)){
+      if(a.ds<from||a.ds>to)continue;
+      const M=months[a.ds.slice(0,7)];if(!M)continue;
+      const bo=D.bonuses.find(q=>q.id===a.id)||{};
+      add(M.pay,'bn:'+a.id,a.amount);A.bonusTotal+=a.amount;
+      if(bo.tax==='none')M.noTax+=a.amount;
+      else if(bo.tax==='custom'){M.cust+=a.amount;M.custTax+=a.amount*(bo.taxRate||0)/100;}
+    }
+  }
+  for(const x of (D.extras||[])){
+    const mk=x.y+'-'+String(x.m).padStart(2,'0');
+    if(mk<from.slice(0,7)||mk>to.slice(0,7))continue;
+    const gr=+x.gross||0;if(!gr)continue;
+    const nt=x.kind==='tre'?(x.net===''||x.net==null?gr:+x.net||0):gr-gr*(+x.rate||0)/100;
+    const M=getM(mk);add(M.pay,'x:'+x.id,gr);M.xG+=gr;M.xN+=nt;A.ded.extra+=gr-nt;
+    if(x.kind==='tfr')A.sim.tfr+=gr;
+    else if(x.kind==='tre'){if(D.tax&&D.tax.on){const n=netOf(D,gr);A.sim.iss+=n.iss;A.sim.sind+=n.sind;A.sim.fond+=n.fond;A.sim.igr+=n.igr;}}
+    else A.sim.igr+=gr*(+x.rate||0)/100;
+  }
   for(const mk in months){
     const M=months[mk];
     if(fixed&&M.hasShift){
@@ -281,7 +421,7 @@ function aggregate(D,from,to){
       A.boaH+=Math.max(0,M.noFestH-ord);
     }
     const g=Object.values(M.pay).reduce((a,b)=>a+b,0);
-    if(D.tax&&D.tax.on&&g>0){const n=netOf(D,g);A.ded.iss+=n.iss;A.ded.sind+=n.sind;A.ded.fond+=n.fond;A.ded.lorda+=n.lorda;A.ded.igr+=n.igr;A.net+=n.net;}
+    if(D.tax&&D.tax.on&&g>0){const bs=Math.max(0,g-M.noTax-M.cust-M.xG);if(bs>0){const n=netOf(D,bs);A.ded.iss+=n.iss;A.ded.sind+=n.sind;A.ded.fond+=n.fond;A.ded.lorda+=n.lorda;A.ded.igr+=n.igr;A.net+=n.net;}A.net+=M.noTax+M.cust-M.custTax+M.xN;}
     else A.net+=g;
     for(const k in M.pay)add(A.pay,k,M.pay[k]);
     for(const k in M.hrs)add(A.hrs,k,M.hrs[k]);
@@ -315,6 +455,11 @@ function bankBalance(D,upTo){
 function migrate(D){
   const d0=defaults();
   for(const k of ['sick','tax','monthly'])if(!D[k])D[k]=d0[k];
+  if(!D.bonuses)D.bonuses=[];
+  if(!D.extras)D.extras=[];
+  if(!D.night)D.night=Object.assign({},d0.night);
+  if(!D.holidays)D.holidays=JSON.parse(JSON.stringify(d0.holidays));
+  if(!D.itSim)D.itSim=Object.assign({},d0.itSim);
   if(!D.mig){for(const b of d0.badges)if(b.kind==='sick'&&!D.badges.some(x=>x.id===b.id))D.badges.push(b);D.mig=2;}
   if(D.mig<3){D.bankRules.forEach(r=>{if(r.delta<0&&r.weekly===undefined)r.weekly=true;});D.mig=3;}
   if(D.mig<4){
@@ -322,6 +467,10 @@ function migrate(D){
     for(const b of d0.badges)if((b.id==='sts'||b.id==='fes')&&!D.badges.some(q=>q.id===b.id))D.badges.push(b);
     D.mig=4;
   }
+  if(D.mig<5){D.bonuses=D.bonuses||[];D.mig=5;}
+  if(D.mig<6){D.extras=D.extras||[];D.mig=6;}
+  if(D.mig<7){D.night=D.night||Object.assign({},d0.night);D.mig=7;}
+  if(D.mig<8){D.holidays=D.holidays||JSON.parse(JSON.stringify(d0.holidays));D.itSim=D.itSim||Object.assign({},d0.itSim);D.mig=8;}
   return D;
 }
 function getDay(D,ds){return D.days[ds]||(D.days[ds]={s:null,b:[],n:''});}
@@ -411,7 +560,7 @@ function calView(){
   for(let d=1;d<=dim;d++){
     const ds=iso(y,m,d),e=D.days[ds],sh=e&&shiftOf(e.s);
     const bds=(e&&e.b||[]).map(x=>badgeOf(x.id)).filter(Boolean);
-    cells.push(h('div',{class:'cell'+(ds===today?' today':'')+(dow(ds)===0?' sun':''),onclick:()=>openDay(ds)},
+    cells.push(h('div',{class:'cell'+(ds===today?' today':'')+(dow(ds)===0?' sun':'')+(holidayName(D,ds)?' hol':''),title:holidayName(D,ds)||null,onclick:()=>openDay(ds)},
       h('div',{class:'n'},d),
       sh&&h('span',{class:'pill',style:'background:'+sh.color},short3(sh)+(e.w!=null&&e.w!==shiftHours(sh)?' '+fh(e.w):'')),
       bds.map(b=>h('span',{class:'bd',style:'background:'+b.color},b.short))));
@@ -445,7 +594,7 @@ function openDay(ds){
     const label=st.scope==='day'?'solo questo giorno':`${T.length} giorni (${T[0].slice(5)} → ${T[T.length-1].slice(5)})`;
     const sel=D.badges.find(b=>b.id===st.bid);
     return h('div',null,
-      h('h3',null,longDate(ds)),
+      h('h3',null,longDate(ds),holidayName(D,ds)&&h('span',{class:'mut',style:'font-weight:400'},' · '+holidayName(D,ds))),
       h('div',{class:'seg'},[['day','Giorno'],['week','Settimana'],['range','Intervallo']].map(([k,l])=>h('button',{class:st.scope===k?'on':'',onclick:()=>{st.scope=k;rebuild();}},l))),
       st.scope==='range'&&h('div',{class:'f'},h('label',null,'Fino al'),h('input',{type:'date',value:st.end,min:ds,onchange:ev=>{st.end=ev.target.value||ds;rebuild();}})),
       h('div',{class:'mut',style:'margin:6px 2px'},'Le azioni sotto si applicano a: '+label),
@@ -480,6 +629,7 @@ function openDay(ds){
             const d=getDay(D,t);d.b=(d.b||[]).filter(q=>q.id!==sel.id);d.b.push({id:sel.id,h:hh});
           }
           save();render();rebuild();toast('Badge aggiunto');},'pri')),
+      (()=>{const aw=bonusAwards(D).filter(a=>a.ds===ds);return aw.length?h('div',null,h('h2',null,'Bonus assegnati oggi'),h('div',{class:'card'},aw.map(a=>{const bo=(D.bonuses||[]).find(q=>q.id===a.id);return h('div',{class:'row'},h('div',{class:'l'},bo?bo.name:'Bonus'),h('div',{class:'r'},eur(a.amount)));}))):null;})(),
       h('h2',null,'Nota'),
       h('textarea',{rows:'2',placeholder:'Nota per questo giorno',onchange:ev=>{const d=getDay(D,ds);d.n=ev.target.value;cleanDay(D,ds);save();}},e.n||''),
       h('div',{style:'display:flex;gap:8px;margin-top:14px'},
@@ -531,8 +681,9 @@ function statsView(){
   const bal=bankBalance(D,to);
   const mlist=s.mode==='range'?Array.from({length:Math.abs(s.m2-s.m1)+1},(_,i)=>Math.min(s.m1,s.m2)+i):[1,2,3,4,5,6,7,8,9,10,11,12];
   const row=(l,v,sub)=>h('div',{class:'row'},h('div',{class:'l'},l,sub&&h('div',{class:'mut'},sub)),h('div',{class:'r'},v));
-  const payLabel=k=>{if(k==='ord')return 'Lavoro ordinario';if(k==='fes')return 'Festività (giornata a paga base)';if(k==='sat')return 'Maggiorazione sabato';const b=badgeOf(k.slice(2));return b?b.name:k;};
-  const wt=k=>k==='ord'?-3:k==='fes'?-2:k==='sat'?-1:0;
+  const payLabel=k=>{if(k==='ord')return 'Lavoro ordinario';if(k==='fes')return 'Festività (giornata a paga base)';if(k==='sat')return 'Maggiorazione sabato';if(k==='night')return 'Maggiorazione notturna';if(k.slice(0,2)==='x:'){const x=(D.extras||[]).find(q=>q.id===k.slice(2));return x?XL[x.kind]:'Importo extra';}if(k.slice(0,3)==='bn:'){const bo=(D.bonuses||[]).find(q=>q.id===k.slice(3));return 'Bonus '+(bo?bo.name:'');}const b=badgeOf(k.slice(2));return b?b.name:k;};
+  const XL={tre:'Tredicesima',tfr:'TFR',prem:'Premio'};
+  const wt=k=>k==='ord'?-3:k==='fes'?-2:k==='sat'?-1:k==='night'?-0.5:0;
   const keys=Object.keys(A.pay).sort((a,b)=>wt(a)-wt(b));
   const num=x=>N5.format(Math.round(x*100)/100);
   const leave=D.badges.filter(b=>b.kind==='leave'),bank=D.badges.filter(b=>b.kind==='bank'),sick=D.badges.filter(b=>b.kind==='sick'),rate=D.badges.filter(b=>b.kind==='rate'),extra=D.badges.filter(b=>b.kind==='extra');
@@ -550,7 +701,57 @@ function statsView(){
     h('div',{class:'card'},keys.length?keys.map(k=>row(payLabel(k),eur(A.pay[k]),A.hrs[k]?fh(A.hrs[k]):null)):h('div',{class:'mut'},'Nessun dato')),
     D.tax.on&&h('div',null,h('h2',null,'Trattenute'),h('div',{class:'card'},
       row('Ritenuta ISS',eur(-A.ded.iss)),row('Ritenuta sindacale ISS',eur(-A.ded.sind)),row('Quota Fondiss dipendente',eur(-A.ded.fond)),
-      row('IGR (imposta netta)',eur(-A.ded.igr),'lorda '+eur(A.ded.lorda)+' − detrazioni '+eur(A.ded.lorda-A.ded.igr)))),
+      row('IGR (imposta netta)',eur(-A.ded.igr),'lorda '+eur(A.ded.lorda)+' − detrazioni '+eur(A.ded.lorda-A.ded.igr)),
+      A.ded.extra?row('Ritenute su tredicesima, TFR e premio',eur(-A.ded.extra)):null)),
+    h('h2',null,'Importi extra'),
+    (D.extras||[]).map(x=>h('div',{class:'card'},
+      h('div',{class:'row'},h('div',{class:'l'},h('b',null,XL[x.kind])),btn('Elimina',()=>{if(confirm('Eliminare '+XL[x.kind]+'?')){D.extras=D.extras.filter(q=>q!==x);save();render();}},'del sm')),
+      h('div',{class:'f'},h('label',{style:'width:70px'},'Anno'),inp(x,'y',{after:()=>render(),num:true}),h('label',{style:'width:70px'},'Mese'),h('select',{value:x.m,onchange:e=>{x.m=+e.target.value;save();render();}},MONTHS.map((n,i)=>h('option',{value:i+1},n)))),
+      h('div',{class:'f'},h('label',{style:'width:70px'},'Lordo €'),inp(x,'gross',{after:()=>render(),num:true})),
+      x.kind==='tre'?h('div',{class:'f'},h('label',{style:'width:70px'},'Netto €'),inp(x,'net',{after:()=>render(),num:true})):h('div',{class:'f'},h('label',{style:'width:100px'},'Tassazione %'),inp(x,'rate',{after:()=>render(),num:true,placeholder:'opzionale'})))),
+    h('div',{style:'display:flex;gap:6px;flex-wrap:wrap'},[['tre','+ Tredicesima'],['tfr','+ TFR'],['prem','+ Premio']].map(([k,l])=>btn(l,()=>{D.extras.push({id:uid('x'),kind:k,y:s.y,m:k==='tre'?12:Math.min(12,Math.max(1,s.m||1)),gross:0,net:k==='tre'?0:undefined,rate:''});save();render();}))),
+    h('div',{class:'mut',style:'margin:6px 4px'},'Tredicesima: inserisci lordo e netto della busta, senza altri calcoli. TFR e premio: importo, mese e tassazione % opzionale (vuota = nessuna ritenuta).'),
+    s.mode==='year'&&(()=>{
+      const I=D.itSim,R=itaxSim(D,A);
+      const f=(l,o)=>h('div',{class:'f'},h('label',{style:'width:150px'},l),o);
+      const n=k=>inp(I,k,{after:()=>render(),num:true});
+      const cb=(k)=>h('input',{type:'checkbox',checked:I[k]!==false,onchange:e=>{I[k]=e.target.checked;save();render();}});
+      const open=!!S.st.itOpen;
+      const head=h('div',{class:'card'},h('div',{class:'row',style:'cursor:pointer',onclick:()=>{S.st.itOpen=!open;render();if(!open)openItaxNote();}},
+        h('div',{class:'l'},h('b',null,'Simulazione tasse in Italia'),h('div',{class:'mut'},'Stima indicativa, non un 730 · tocca per '+(open?'chiudere':'aprire'))),
+        h('div',{class:'r'},open?'▾':'▸')));
+      if(!open)return h('div',null,h('h2',null,'Imposte'),head);
+      return h('div',null,h('h2',null,'Imposte'),head,
+        h('div',{class:'card'},
+          h('div',{class:'mut'},'Da versare in Italia (stima)'),h('div',{class:'big'},eur(R.tot)),
+          h('div',{class:'mut'},'IRPEF netta '+eur(R.netta)+' − credito IGR '+eur(R.cred)+(R.reg||R.com?' + addizionali '+eur(R.reg+R.com):''))),
+        h('div',{class:'mut',style:'margin:8px 4px 4px'},'Parametri'),
+        h('div',{class:'card'},
+          f('Franchigia frontalieri €',n('franchigia')),
+          f('Credito IGR',h('select',{value:I.method||'rip',onchange:e=>{I.method=e.target.value;save();render();}},h('option',{value:'rip'},'Riparametrato'),h('option',{value:'int'},'Integrale'))),
+          h('div',{class:'row'},h('div',{class:'l'},'Fondiss deducibile (max 5.164,57 €)'),cb('fondiss')),
+          h('div',{class:'row'},h('div',{class:'l'},'Ulteriore detrazione 1.000 € (20–40 mila €)'),cb('cuneo')),
+          f('Addizionale regionale %',n('addReg')),
+          f('Addizionale comunale %',n('addCom')),
+          f('Altre detrazioni €',n('altreDetr')),
+          f('Rettifica lordo € (±)',n('rettifica'))),
+        h('div',{class:'mut',style:'margin:8px 4px 4px'},'Dettaglio del calcolo, sull’anno mostrato (usa «Fino a fine anno» per un anno intero)'),
+        h('div',{class:'card'},
+          row('Lordo San Marino considerato',eur(R.lordo),'senza TFR, con rettifica'),
+          row('Franchigia frontalieri',eur(-R.fr)),
+          row('Reddito complessivo',eur(R.compl)),
+          row('Contributi dedotti (ISS e Fondiss)',eur(-(R.contr+R.fond))),
+          row('Imponibile IRPEF',eur(R.imp)),
+          row('IRPEF lorda',eur(R.lorda),'23% fino a 28 mila, 33% fino a 50 mila, 43% oltre'),
+          row('Detrazioni lavoro dipendente',eur(-R.detr)),
+          row('IRPEF netta',eur(R.netta)),
+          row('IGR pagata a San Marino',eur(R.igr)),
+          row('Credito per imposte estere',eur(-R.cred),I.method==='int'?'integrale':'riparametrato sulla franchigia'),
+          row('IRPEF residua',eur(R.dov)),
+          (R.reg||R.com)?row('Addizionali',eur(R.reg+R.com)):null,
+          row(h('b',null,'Da versare in Italia (stima)'),h('b',null,eur(R.tot)))),
+        h('div',{style:'margin:6px 0'},btn('Leggi l’avvertenza',openItaxNote)));
+    })(),
     h('h2',null,'Turni'),
     h('div',{class:'card'},D.shifts.map(sh=>row(sh.name,(A.shiftCount[sh.id]||0)+'',fh(A.shiftHours[sh.id]||0)))),
     h('h2',null,'Assenze e voci'),
@@ -632,6 +833,14 @@ function inp(obj,key,o){o=o||{};
   return h('input',{type:o.num?'number':(o.type||'text'),step:o.num?'any':null,inputmode:o.num?'decimal':null,value:obj[key]==null?'':obj[key],
     onchange:e=>{let v=e.target.value;if(o.num){v=parseFloat(String(v).replace(',','.'));if(isNaN(v))v=0;}obj[key]=v;save();o.after&&o.after(v);}});
 }
+const HD={name:'',d:1,m:1};
+function openItaxNote(){
+  openSheet(()=>h('div',null,h('h3',null,'Avvertenza sulla simulazione'),
+    h('p',null,'Questa simulazione ha esclusivo valore indicativo. Il calcolo è ipotetico: si basa sui dati inseriti nell’app e su parametri semplificati (scaglioni IRPEF 2026, detrazioni per lavoro dipendente, franchigia per i lavoratori frontalieri e credito per le imposte pagate a San Marino).'),
+    h('p',null,'Non costituisce una dichiarazione dei redditi né un modello 730 e non sostituisce la consulenza di un CAF, di un commercialista o di altro professionista abilitato. Non tiene conto, tra l’altro, di carichi di famiglia, oneri deducibili e detraibili, acconti e altri redditi.'),
+    h('p',null,'Il trattamento del credito per le imposte estere è oggetto di interpretazioni differenti: l’importo effettivamente dovuto può quindi discostarsi, anche in misura significativa, da quello qui indicato.'),
+    h('div',{style:'margin-top:12px'},btn('Ho capito',closeSheet,'pri'))));
+}
 function setView(){
   const KINDS={sick:'Malattia / infortunio (indennità a % per giorno)',leave:'Ferie / permesso (copre ore, pagate)',bank:'Banca ore (copre ore, scala dal saldo)',rate:'Tariffa sostitutiva (es. festivi)',extra:'Ore extra (es. straordinari)'};
   const rateUsed=id=>D.badges.some(b=>b.rate===id);
@@ -658,6 +867,26 @@ function setView(){
     b.kind==='sick'&&h('div',{class:'f'},h('label',null,'Regola'),h('select',{value:b.policy,onchange:e=>{b.policy=e.target.value;save();}},D.sick.policies.map(p=>h('option',{value:p.id},p.name)))),
     b.kind==='rate'&&h('div',{class:'row'},h('div',{class:'l'},'Giornata già nella paga fissa (voce Festività)'),h('input',{type:'checkbox',checked:b.inclBase!==false,onchange:e=>{b.inclBase=e.target.checked;save();}})),
     h('div',{style:'text-align:right'},btn('Elimina',()=>{if(confirm('Eliminare il badge "'+b.name+'"? Verrà tolto anche dai giorni.')){D.badges=D.badges.filter(x=>x!==b);for(const k in D.days){D.days[k].b=(D.days[k].b||[]).filter(q=>q.id!==b.id);cleanDay(D,k);}save();render();}},'del sm'))));
+  // Bonus
+  const bonusCards=(D.bonuses||[]).map(b=>{
+    const c=b.cond||(b.cond={shift:'',days:[],minCount:0,minHours:0,window:null});
+    return h('div',{class:'card'},
+      h('div',{class:'f'},h('label',null,'Nome'),inp(b,'name')),
+      h('div',{class:'f'},h('label',null,'Importo'),h('div',{style:'width:90px;flex:none'},inp(b,'amount',{num:true})),
+        h('select',{value:b.type||'fixed',onchange:e=>{b.type=e.target.value;save();}},h('option',{value:'fixed'},'€ fissi'),h('option',{value:'hourly'},'€ per ora'),h('option',{value:'pct'},'% paga oraria, per ora'))),
+      h('div',{class:'f'},h('label',null,'Periodo'),h('select',{value:b.period||'week',onchange:e=>{b.period=e.target.value;save();}},h('option',{value:'week'},'Settimana (lun–dom)'),h('option',{value:'month'},'Mese'),h('option',{value:'year'},'Anno'))),
+      h('div',{class:'f'},h('label',null,'Solo turno'),h('select',{value:c.shift||'',onchange:e=>{c.shift=e.target.value;save();}},h('option',{value:''},'Qualsiasi turno'),D.shifts.map(s=>h('option',{value:s.id},s.name)))),
+      h('div',{class:'f'},h('label',null,'Giorni'),h('div',{class:'days'},WD1.map((l,i)=>{const d=(i+1)%7;const cur=c.days||(c.days=[]);return h('button',{class:cur.includes(d)?'on':'',onclick:()=>{c.days=cur.includes(d)?cur.filter(x=>x!==d):cur.concat(d);save();render();}},l);}))),
+      h('div',{class:'mut',style:'margin:0 4px 6px'},'Giorno in cui inizia il turno. Nessun giorno selezionato = tutti i giorni.'),
+      h('div',{class:'f'},h('label',{style:'width:130px'},'Minimo turni'),inp(c,'minCount',{num:true})),
+      h('div',{class:'f'},h('label',{style:'width:130px'},'Minimo ore'),inp(c,'minHours',{num:true})),
+      h('div',{class:'row'},h('div',{class:'l'},'Conta solo le ore in una fascia',h('div',{class:'mut'},'es. ore notturne 22:00–06:00')),h('input',{type:'checkbox',checked:!!(c.window&&c.window.from),onchange:e=>{c.window=e.target.checked?{from:'22:00',to:'06:00'}:null;save();render();}})),
+      c.window&&c.window.from&&h('div',{class:'f'},h('label',null,'Dalle'),inp(c.window,'from',{type:'time'}),h('label',{style:'width:34px'},'alle'),inp(c.window,'to',{type:'time'})),
+      h('div',{class:'row'},h('div',{class:'l'},'Una sola volta per periodo',h('div',{class:'mut'},'Attivo: il bonus si assegna una volta per ogni periodo in cui raggiungi la condizione. Spento: si assegna per ogni turno che conta.')),h('input',{type:'checkbox',checked:b.once!==false,onchange:e=>{b.once=e.target.checked;save();}})),
+      h('div',{class:'f'},h('label',null,'Tassazione'),h('select',{value:b.tax||'normal',onchange:e=>{b.tax=e.target.value;save();render();}},h('option',{value:'normal'},'Come lo stipendio del mese'),h('option',{value:'none'},'Non tassato'),h('option',{value:'custom'},'Aliquota diversa'))),
+      b.tax==='custom'&&h('div',{class:'f'},h('label',{style:'width:130px'},'Aliquota %'),inp(b,'taxRate',{num:true})),
+      h('div',{style:'text-align:right'},btn('Elimina',()=>{if(confirm('Eliminare il bonus "'+b.name+'"?')){D.bonuses=D.bonuses.filter(x=>x!==b);save();render();}},'del sm')));
+  });
   // Banca ore
   const ruleRows=D.bankRules.map((r,i)=>h('div',{style:'border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:6px'},
     h('div',{class:'f'},h('label',{style:'width:70px'},r.over!=null?'Oltre':'Turno di'),h('div',{style:'width:80px;flex:none'},inp(r,r.over!=null?'over':'hours',{num:true})),h('label',{style:'width:50px'},'ore →'),h('div',{style:'width:80px;flex:none'},inp(r,'delta',{num:true})),h('span',{class:'mut',style:'flex:1'},'h banca'),btn('✕',()=>{D.bankRules.splice(i,1);save();render();},'del sm')),
@@ -684,6 +913,27 @@ function setView(){
     h('h2',null,'Paghe e tariffe (€/h)'),h('div',{class:'card'},rateRows),btn('+ Aggiungi voce',()=>{D.rates.push({id:uid('r'),name:'Nuova tariffa',value:0});save();render();}),
     h('div',{class:'mut',style:'margin:6px 4px'},'“Paga oraria” e “Maggiorazione sabato” sono fisse: il sabato si paga paga oraria + maggiorazione. Il resto è libero.'),
     h('h2',null,'Badge'),badgeCards,btn('+ Aggiungi badge',()=>{D.badges.push({id:uid('b'),name:'Nuovo badge',kind:'rate',rate:'base',color:'#64748b',short:'NEW'});save();render();}),
+    h('h2',null,'Festività (caselle rosse)'),
+    h('div',{class:'card'},D.holidays.map(x=>h('div',{class:'row'},
+      h('input',{type:'checkbox',checked:!!x.on,onchange:e=>{x.on=e.target.checked;save();}}),
+      h('div',{class:'l',style:'margin-left:8px'},x.name,h('div',{class:'mut'},x.md==='corpus'?'Giovedì dopo la Santissima Trinità':x.md==='pasquetta'?'Il giorno dopo Pasqua':x.md.slice(3)+'/'+x.md.slice(0,2))),
+      x.custom?btn('✕',()=>{D.holidays=D.holidays.filter(q=>q!==x);save();render();},'del sm'):null))),
+    h('div',{class:'card'},
+      h('div',{class:'f'},h('label',null,'Nome'),h('input',{type:'text',value:HD.name,placeholder:'Nuova festa',onchange:e=>{HD.name=e.target.value;}})),
+      h('div',{class:'f'},h('label',null,'Giorno'),h('input',{type:'number',min:'1',max:'31',value:HD.d,onchange:e=>{HD.d=+e.target.value||1;}}),h('label',null,'Mese'),h('select',{value:HD.m,onchange:e=>{HD.m=+e.target.value;}},MONTHS.map((n,i)=>h('option',{value:i+1},n)))),
+      btn('+ Aggiungi festa',()=>{if(!HD.name.trim()){toast('Scrivi un nome');return;}D.holidays.push({id:uid('h'),name:HD.name.trim(),md:String(HD.m).padStart(2,'0')+'-'+String(Math.min(31,Math.max(1,HD.d))).padStart(2,'0'),on:true,custom:true});HD.name='';save();render();})),
+    h('div',{class:'mut',style:'margin:6px 4px'},'Le feste attive sono evidenziate in rosso nel calendario. Sono già attive quelle solo sammarinesi; quelle comuni all’Italia sono spente.'),
+    h('h2',null,'Paga notturna'),
+    h('div',{class:'card'},
+      h('div',{class:'row'},h('div',{class:'l'},'Attiva maggiorazione notturna',h('div',{class:'mut'},'Le ore di turno dentro la fascia sono pagate di più; prima e dopo la fascia resta la paga oraria.')),h('input',{type:'checkbox',checked:!!D.night.on,onchange:e=>{D.night.on=e.target.checked;save();render();}})),
+      D.night.on&&h('div',null,
+        h('div',{class:'f'},h('label',null,'Dalle'),inp(D.night,'from',{type:'time'}),h('label',{style:'width:34px'},'alle'),inp(D.night,'to',{type:'time'})),
+        h('div',{class:'f'},h('label',null,'Importo'),h('div',{style:'width:90px;flex:none'},inp(D.night,'rate',{num:true})),
+          h('select',{value:D.night.kind||'extra',onchange:e=>{D.night.kind=e.target.value;save();}},h('option',{value:'extra'},'€/h in più'),h('option',{value:'total'},'€/h totali (sostituisce la paga oraria)'))))),
+    h('h2',null,'Bonus'),
+    bonusCards.length?bonusCards:h('div',{class:'mut',style:'margin:0 4px 6px'},'Nessun bonus. Esempio: 50 € una volta a settimana se fai almeno 5 turni di notte.'),
+    btn('+ Aggiungi bonus',()=>{D.bonuses.push({id:uid('bn'),name:'Nuovo bonus',amount:50,type:'fixed',period:'week',once:true,tax:'normal',taxRate:0,cond:{shift:'',days:[],minCount:5,minHours:0,window:null}});save();render();}),
+    h('div',{class:'mut',style:'margin:6px 4px'},'Il bonus compare nel lordo del mese in cui si raggiunge la condizione (per le settimane a cavallo di due mesi, il mese del giorno che completa la soglia).'),
     h('h2',null,'Modalità paga'),
     h('div',{class:'card'},
       h('div',{class:'row'},h('div',{class:'l'},'Stipendio mensile fisso',h('div',{class:'mut'},'Come in busta paga: lavoro ordinario = monte ore − festività − ferie − permessi banca ore − straordinari. Il monte ore vale per ogni mese con turni.')),h('input',{type:'checkbox',checked:D.monthly.on,onchange:e=>{D.monthly.on=e.target.checked;save();}})),
